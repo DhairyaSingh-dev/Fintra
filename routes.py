@@ -4,54 +4,79 @@ Defines all Flask routes and API endpoints.
 """
 import logging
 import os
+import re
 import secrets
 import traceback
-import jwt
-import requests
-import yfinance as yf
-import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
-from flask import Blueprint, request, jsonify, session, redirect, make_response
+
+import jwt
 import pandas as pd
+import requests
+import yfinance as yf
+from flask import Blueprint, jsonify, make_response, redirect, request, session
 
 # Google Auth imports for secure ID token verification
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 
-from config import Config
-from auth import (
-    generate_jwt_token, verify_jwt_token,
-    set_token_cookies, require_auth
+from analysis import (
+    call_gemini_api,
+    clean_df,
+    compute_macd,
+    compute_rsi,
+    conversation_context,
+    find_recent_macd_crossover,
+    generate_rule_based_analysis,
+    get_gemini_ai_analysis,
+    get_gemini_position_summary,
+    latest_symbol_data,
 )
-from database import db
-from models import User, Position
-from validation import (
-    validate_symbol, sanitize_string, validate_float, validate_int,
-    validate_date, validate_date_range, validate_required_fields, validate_strategy,
-    create_validation_error,
-    POSITION_QUANTITY_MIN, POSITION_QUANTITY_MAX, POSITION_PRICE_MIN, POSITION_PRICE_MAX,
-    POSITION_NOTES_MAX_LENGTH,
-    BACKTEST_BALANCE_MIN, BACKTEST_BALANCE_MAX, BACKTEST_ATR_MULTIPLIER_MIN,
-    BACKTEST_ATR_MULTIPLIER_MAX, BACKTEST_RISK_PER_TRADE_MIN, BACKTEST_RISK_PER_TRADE_MAX
+from auth import generate_jwt_token, require_auth, set_token_cookies, verify_jwt_token
+from backtesting import (
+    DATA_LAG_DAYS,
+    BacktestEngine,
+    check_data_availability,
+    load_stock_data,
 )
 from chatbot_validation import (
-    validate_chat_input, ChatbotSafetyEnforcer, get_conversation_state,
-    FrameworkValidator, ConversationStateTracker
+    ChatbotSafetyEnforcer,
+    ConversationStateTracker,
+    FrameworkValidator,
+    get_conversation_state,
+    validate_chat_input,
 )
-from analysis import (
-    latest_symbol_data, conversation_context, clean_df,
-    compute_rsi, compute_macd, generate_rule_based_analysis, call_gemini_api,
-    get_gemini_ai_analysis, get_gemini_position_summary,
-    find_recent_macd_crossover
-)
-from backtesting import BacktestEngine, load_stock_data, check_data_availability, DATA_LAG_DAYS
+from config import Config
+from database import db
 from mc_engine import MonteCarloEngine, SimulationConfig
+from models import Position, User
+from validation import (
+    BACKTEST_ATR_MULTIPLIER_MAX,
+    BACKTEST_ATR_MULTIPLIER_MIN,
+    BACKTEST_BALANCE_MAX,
+    BACKTEST_BALANCE_MIN,
+    BACKTEST_RISK_PER_TRADE_MAX,
+    BACKTEST_RISK_PER_TRADE_MIN,
+    POSITION_NOTES_MAX_LENGTH,
+    POSITION_PRICE_MAX,
+    POSITION_PRICE_MIN,
+    POSITION_QUANTITY_MAX,
+    POSITION_QUANTITY_MIN,
+    create_validation_error,
+    sanitize_string,
+    validate_date,
+    validate_date_range,
+    validate_float,
+    validate_int,
+    validate_required_fields,
+    validate_strategy,
+    validate_symbol,
+)
 
 # Redis and RAG imports
 try:
-    from redis_client import redis_client, init_redis, ChatCache, RateLimiter, DataCache
-    from rag_engine import rag_engine, init_rag
+    from rag_engine import init_rag, rag_engine
+    from redis_client import ChatCache, DataCache, RateLimiter, init_redis, redis_client
     REDIS_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"Redis/RAG modules not available: {e}")
@@ -1603,7 +1628,7 @@ def admin_init_redis():
         try:
             import subprocess
             import sys
-            
+
             # Run indexing script
             result = subprocess.run(
                 [sys.executable, "scripts/index_knowledge.py"],

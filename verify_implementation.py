@@ -4,6 +4,7 @@ Quick verification script for the implementation
 """
 import os
 
+
 def verify_files():
     """Verify all required files exist and were modified correctly"""
 

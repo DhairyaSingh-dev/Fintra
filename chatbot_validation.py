@@ -3,12 +3,12 @@ Chatbot Framework Validation Module
 Validates technical analysis frameworks and definitions against standard methodologies.
 Prevents users from learning incorrect concepts.
 """
-import re
 import json
 import logging
-from typing import Dict, List, Tuple, Optional, Any
-from difflib import SequenceMatcher
+import re
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -223,13 +223,44 @@ class ConversationStateTracker:
 class FrameworkValidator:
     """Validates technical analysis frameworks against standards"""
     
+    # Greetings and casual phrases to skip validation
+    CASUAL_PHRASES = [
+        r"^\s*hi\s*$",
+        r"^\s*hello\s*$",
+        r"^\s*hey\s*$",
+        r"^\s*good morning\s*$",
+        r"^\s*good afternoon\s*$",
+        r"^\s*good evening\s*$",
+        r"^\s*how are you\s*$",
+        r"^\s*what's up\s*$",
+        r"^\s*sup\s*$",
+        r"^\s*yo\s*$",
+        r"^\s*thanks?\s*$",
+        r"^\s*thank you\s*$",
+        r"^\s*bye\s*$",
+        r"^\s*goodbye\s*$",
+        r"^\s*see ya\s*$",
+    ]
+    
     @staticmethod
     def detect_nonstandard_framework(query: str) -> Tuple[bool, Optional[Dict]]:
         """
         Detect if user is using non-standard framework definitions
         Returns: (is_nonstandard, correction_info)
         """
-        query_lower = query.lower()
+        query_lower = query.lower().strip()
+        
+        # Skip validation for greetings and casual messages
+        for pattern in FrameworkValidator.CASUAL_PHRASES:
+            if re.match(pattern, query_lower, re.IGNORECASE):
+                return False, None
+        
+        # Skip very short queries (likely greetings or casual chat)
+        if len(query_lower) < 15 and not any(keyword in query_lower for keyword in [
+            "rsi", "macd", "sma", "ema", "support", "resistance", "trend", "volume",
+            "indicator", "analysis", "strategy", "trade", "buy", "sell", "stock", "price"
+        ]):
+            return False, None
         
         # Check each framework for misconceptions
         for framework_key, framework_data in STANDARD_FRAMEWORKS.items():

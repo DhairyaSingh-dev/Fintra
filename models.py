@@ -3,7 +3,9 @@ Database Models Module
 Defines the database schema for Users and their Positions.
 """
 from datetime import datetime, timezone
+
 from database import db
+
 
 class User(db.Model):
     """Represents a user in the database."""

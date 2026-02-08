@@ -3,8 +3,11 @@
 Test script for Monte Carlo simulation engine
 """
 import sys
+
 import numpy as np
+
 from mc_engine import MonteCarloEngine, SimulationConfig, Trade
+
 
 def test_monte_carlo_engine():
     """Test the Monte Carlo engine with sample data"""
@@ -96,7 +99,7 @@ def test_api_endpoint():
     
     try:
         import requests
-        
+
         # Sample data for API
         test_data = {
             'trades': [

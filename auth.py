@@ -3,12 +3,13 @@ Authentication Module
 Handles OAuth, JWT tokens, session management, and authentication middleware.
 """
 import logging
-import jwt
-import requests
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from flask import session, request, jsonify, current_app
-from typing import Optional, Dict
+from typing import Dict, Optional
+
+import jwt
+import requests
+from flask import current_app, jsonify, request, session
 
 from config import Config
 

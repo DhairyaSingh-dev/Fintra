@@ -7,24 +7,26 @@ This module tests the data update pipeline to ensure:
 3. Data integrity is preserved
 """
 
-import pytest
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import tempfile
 import shutil
 
 # Import the module under test
 import sys
+import tempfile
+from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pandas as pd
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.check_and_update_data import (
+    SEBI_LAG_DAYS,
+    UPDATE_BUFFER_DAYS,
     DataUpdatePipeline,
     SEBIComplianceError,
-    SEBI_LAG_DAYS,
-    UPDATE_BUFFER_DAYS
 )
 
 

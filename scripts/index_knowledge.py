@@ -12,9 +12,10 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rag_engine import rag_engine, init_rag
-from redis_client import init_redis
 import logging
+
+from rag_engine import init_rag, rag_engine
+from redis_client import init_redis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

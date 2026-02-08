@@ -3,12 +3,12 @@ RAG (Retrieval-Augmented Generation) Engine
 Implements vector search using Redis for knowledge retrieval
 """
 import json
-import os
-from typing import List, Dict, Optional, Any
 import logging
+import os
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from redis_client import redis_client, RedisConfig
+from redis_client import RedisConfig, redis_client
 
 logger = logging.getLogger(__name__)
 

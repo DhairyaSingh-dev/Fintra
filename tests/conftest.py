@@ -3,15 +3,16 @@ Pytest configuration and fixtures for Fintra application tests
 """
 import os
 import sys
-import pytest
 from datetime import datetime, timedelta, timezone
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import create_app
 from database import db
-from models import User, Position
+from models import Position, User
 
 
 @pytest.fixture(scope='session')

@@ -3,10 +3,12 @@
 Test script for Monte Carlo simulation engine
 """
 import sys
-import numpy as np
 
 # Suppress numpy warnings
 import warnings
+
+import numpy as np
+
 warnings.filterwarnings('ignore')
 
 def test_monte_carlo_engine():
@@ -16,7 +18,7 @@ def test_monte_carlo_engine():
     
     try:
         from mc_engine import MonteCarloEngine, SimulationConfig
-        
+
         # Create sample trades (simulating a winning strategy)
         sample_trades = [
             {'entry_price': 100, 'exit_price': 105, 'pnl_pct': 5.0, 'result': 'Win', 'days_held': 10},

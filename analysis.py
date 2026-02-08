@@ -3,13 +3,14 @@ Analysis Module
 Handles stock data analysis, technical indicators, AI integration with Gemini.
 """
 import logging
-import requests
-import statistics
-import random
 import math
-from typing import List, Dict, Tuple, Optional
-import pandas as pd
+import random
+import statistics
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
+import pandas as pd
+import requests
 
 from config import Config
 

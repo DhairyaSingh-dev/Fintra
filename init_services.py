@@ -3,8 +3,9 @@ Application startup script
 Initializes Redis, RAG, and other services
 """
 import logging
-from redis_client import init_redis
+
 from rag_engine import init_rag
+from redis_client import init_redis
 
 logger = logging.getLogger(__name__)
 

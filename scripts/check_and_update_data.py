@@ -23,15 +23,15 @@ Example:
         → Data needs update (fetch up to January 9, 2025)
 """
 
-import os
-import sys
+import argparse
 import json
 import logging
-import argparse
+import os
 import random
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import yfinance as yf

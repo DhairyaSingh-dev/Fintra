@@ -2,10 +2,11 @@
 Main Application Entry Point
 Initializes Flask app, configures middleware, registers blueprints.
 """
-import os
 import logging
+import os
 import traceback
 from sys import stdout
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from sqlalchemy import text
@@ -13,6 +14,7 @@ from sqlalchemy import text
 from config import Config
 from database import db
 from routes import api
+
 #easter egg
 # ==================== LOGGING SETUP ====================
 logging.basicConfig(
@@ -66,8 +68,8 @@ def create_app():
             """Worker thread to initialize services without blocking startup"""
             try:
                 # Import here to avoid circular imports
-                from redis_client import redis_client, init_redis
                 from rag_engine import init_rag, rag_engine
+                from redis_client import init_redis, redis_client
                 
                 logger.info("🔄 Background initialization started...")
                 

@@ -5,6 +5,7 @@ Handles environment variables, secrets, and application settings.
 import os
 from datetime import timedelta
 
+
 class Config:
     """Base configuration class"""
 

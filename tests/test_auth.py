@@ -1,9 +1,11 @@
 """
 Unit tests for authentication module
 """
-import pytest
 from datetime import datetime, timedelta, timezone
+
 import jwt as pyjwt
+import pytest
+
 from auth import generate_jwt_token, verify_jwt_token
 
 

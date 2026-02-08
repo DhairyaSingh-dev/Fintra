@@ -2,15 +2,16 @@
 Redis Configuration and Client
 Handles Redis connection, caching, and vector search
 """
+import hashlib
+import json
+import logging
 import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 import redis
 from redisvl.index import SearchIndex
 from redisvl.query import VectorQuery
-import logging
-from typing import Optional, List, Dict, Any
-import json
-import hashlib
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 

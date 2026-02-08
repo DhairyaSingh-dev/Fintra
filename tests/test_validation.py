@@ -3,18 +3,26 @@ Unit tests for validation module
 Tests comprehensive backend validation including symbol validation,
 XSS prevention, and data type validation.
 """
-import pytest
 import sys
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from validation import (
-    validate_symbol, sanitize_string, validate_float, validate_int,
-    validate_date, validate_date_range, validate_required_fields, validate_strategy,
-    create_validation_error, XSS_PATTERNS
+    XSS_PATTERNS,
+    create_validation_error,
+    sanitize_string,
+    validate_date,
+    validate_date_range,
+    validate_float,
+    validate_int,
+    validate_required_fields,
+    validate_strategy,
+    validate_symbol,
 )
 
 
