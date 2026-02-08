@@ -53,22 +53,33 @@ jobs:
     - name: Parse test results
       id: parse
       run: |
-        # Extract test counts from output
-        PASSED=$(grep -oP '\d+ passed' test_output.txt | grep -oP '\d+' || echo "0")
-        FAILED=$(grep -oP '\d+ failed' test_output.txt | grep -oP '\d+' || echo "0")
-        SKIPPED=$(grep -oP '\d+ skipped' test_output.txt | grep -oP '\d+' || echo "0")
-        ERROR=$(grep -oP '\d+ error' test_output.txt | grep -oP '\d+' || echo "0")
-        COVERAGE=$(grep -oP '\d+\.?\d*%' coverage.xml | head -1 || echo "0%")
+        # Extract test counts from output (trim whitespace)
+        PASSED=$(grep -oP '\d+ passed' test_output.txt | grep -oP '\d+' | head -1 || echo "0")
+        FAILED=$(grep -oP '\d+ failed' test_output.txt | grep -oP '\d+' | head -1 || echo "0")
+        SKIPPED=$(grep -oP '\d+ skipped' test_output.txt | grep -oP '\d+' | head -1 || echo "0")
+        ERROR=$(grep -oP '\d+ error' test_output.txt | grep -oP '\d+' | head -1 || echo "0")
+        
+        # Get coverage from pytest output line
+        COVERAGE_LINE=$(grep -oP '\d+\.\d+%' test_output.txt | tail -1 || echo "0%")
+        COVERAGE=${COVERAGE_LINE:-"0%"}
+        
+        # Get exit code and trim whitespace
+        EXIT_CODE=$(echo "${{ steps.pytest.outputs.exit_code }}" | tr -d '[:space:]')
         
         echo "passed=$PASSED" >> $GITHUB_OUTPUT
         echo "failed=$FAILED" >> $GITHUB_OUTPUT
         echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
         echo "error=$ERROR" >> $GITHUB_OUTPUT
         echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-        echo "exit_code=${{ steps.pytest.outputs.exit_code }}" >> $GITHUB_OUTPUT
+        echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
         
-        # Create result file for aggregation
-        echo "{\"python_version\": \"${{ matrix.python-version }}\", \"passed\": $PASSED, \"failed\": $FAILED, \"skipped\": $SKIPPED, \"error\": $ERROR, \"coverage\": \"$COVERAGE\", \"exit_code\": ${{ steps.pytest.outputs.exit_code }}}" > result_${{ matrix.python-version }}.json
+        # Create result file for aggregation (ensure integers for exit_code)
+        echo "{\"python_version\": \"${{ matrix.python-version }}\", \"passed\": ${PASSED:-0}, \"failed\": ${FAILED:-0}, \"skipped\": ${SKIPPED:-0}, \"error\": ${ERROR:-0}, \"coverage\": \"$COVERAGE\", \"exit_code\": ${EXIT_CODE:-1}}" > result.json
+        
+        # Debug output
+        echo "Debug: Exit code is '$EXIT_CODE'"
+        echo "Debug: Result file contents:"
+        cat result.json
 
     - name: Upload test results artifact
       uses: actions/upload-artifact@v4
@@ -76,7 +87,7 @@ jobs:
       with:
         name: test-result-py${{ matrix.python-version }}
         path: |
-          result_${{ matrix.python-version }}.json
+          result.json
           test_output.txt
           htmlcov/
           coverage.xml
@@ -117,20 +128,32 @@ jobs:
         TOTAL_SKIPPED=0
         TOTAL_ERRORS=0
         
+        # Debug: List what we have
+        echo "Debug: Contents of artifacts directory:"
+        ls -la artifacts/ || echo "No artifacts directory"
+        
         for version in 3.9 3.10 3.11; do
-          result_file="artifacts/test-result-py${version}/result_${version}.json"
+          # Try both possible paths
+          result_file="artifacts/test-result-py${version}/result.json"
+          alt_result_file="artifacts/result.json"
+          
+          echo "Debug: Looking for ${result_file}"
           
           if [ -f "$result_file" ]; then
-            # Parse JSON results
-            PASSED=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['passed'])")
-            FAILED=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['failed'])")
-            SKIPPED=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['skipped'])")
-            ERRORS=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['error'])")
-            COVERAGE=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['coverage'])")
-            EXIT_CODE=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['exit_code'])")
+            echo "Debug: Found result file for Python ${version}"
             
-            # Determine status
-            if [ "$EXIT_CODE" == "0" ]; then
+            # Parse JSON results with better error handling
+            PASSED=$(python3 -c "import json; data=json.load(open('$result_file')); print(data.get('passed', 0))")
+            FAILED=$(python3 -c "import json; data=json.load(open('$result_file')); print(data.get('failed', 0))")
+            SKIPPED=$(python3 -c "import json; data=json.load(open('$result_file')); print(data.get('skipped', 0))")
+            ERRORS=$(python3 -c "import json; data=json.load(open('$result_file')); print(data.get('error', 0))")
+            COVERAGE=$(python3 -c "import json; data=json.load(open('$result_file')); print(data.get('coverage', '0%'))")
+            EXIT_CODE=$(python3 -c "import json; data=json.load(open('$result_file')); print(data.get('exit_code', 1))")
+            
+            echo "Debug: Python ${version} - Exit code: ${EXIT_CODE}, Passed: ${PASSED}, Failed: ${FAILED}"
+            
+            # Determine status (check if FAILED + ERRORS > 0)
+            if [ "$EXIT_CODE" = "0" ] && [ "$FAILED" = "0" ] && [ "$ERRORS" = "0" ]; then
               STATUS="✅ PASS"
             else
               STATUS="❌ FAIL"
@@ -145,6 +168,7 @@ jobs:
             
             echo "| Python ${version} | ${STATUS} | ${PASSED} | ${FAILED} | ${SKIPPED} | ${ERRORS} | ${COVERAGE} |" >> $GITHUB_STEP_SUMMARY
           else
+            echo "Debug: Result file not found for Python ${version}"
             echo "| Python ${version} | ⚠️ MISSING | - | - | - | - | - |" >> $GITHUB_STEP_SUMMARY
             OVERALL_STATUS="❌ FAILED"
           fi
