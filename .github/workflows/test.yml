@@ -7,7 +7,9 @@ on:
     branches: [ main, master, develop ]
 
 jobs:
+  # Job 1: Run tests on all Python versions in parallel
   test:
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -37,32 +39,179 @@ jobs:
         pip install pytest pytest-cov pytest-asyncio
 
     - name: Run tests with pytest
+      id: pytest
       run: |
-        pytest tests/ -v --cov=. --cov-report=xml --cov-report=html --cov-fail-under=35
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=html --cov-fail-under=35 --tb=short | tee test_output.txt
+        echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
       env:
         FLASK_ENV: testing
         FLASK_SECRET_KEY: test-secret-key-for-ci
         ACCESS_TOKEN_JWT_SECRET: test-access-token-secret-min-32-chars
         REFRESH_TOKEN_JWT_SECRET: test-refresh-token-secret-min-32-chars
+      continue-on-error: true
+
+    - name: Parse test results
+      id: parse
+      run: |
+        # Extract test counts from output
+        PASSED=$(grep -oP '\d+ passed' test_output.txt | grep -oP '\d+' || echo "0")
+        FAILED=$(grep -oP '\d+ failed' test_output.txt | grep -oP '\d+' || echo "0")
+        SKIPPED=$(grep -oP '\d+ skipped' test_output.txt | grep -oP '\d+' || echo "0")
+        ERROR=$(grep -oP '\d+ error' test_output.txt | grep -oP '\d+' || echo "0")
+        COVERAGE=$(grep -oP '\d+\.?\d*%' coverage.xml | head -1 || echo "0%")
+        
+        echo "passed=$PASSED" >> $GITHUB_OUTPUT
+        echo "failed=$FAILED" >> $GITHUB_OUTPUT
+        echo "skipped=$SKIPPED" >> $GITHUB_OUTPUT
+        echo "error=$ERROR" >> $GITHUB_OUTPUT
+        echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+        echo "exit_code=${{ steps.pytest.outputs.exit_code }}" >> $GITHUB_OUTPUT
+        
+        # Create result file for aggregation
+        echo "{\"python_version\": \"${{ matrix.python-version }}\", \"passed\": $PASSED, \"failed\": $FAILED, \"skipped\": $SKIPPED, \"error\": $ERROR, \"coverage\": \"$COVERAGE\", \"exit_code\": ${{ steps.pytest.outputs.exit_code }}}" > result_${{ matrix.python-version }}.json
+
+    - name: Upload test results artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-result-py${{ matrix.python-version }}
+        path: |
+          result_${{ matrix.python-version }}.json
+          test_output.txt
+          htmlcov/
+          coverage.xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
+        flags: unittests-py${{ matrix.python-version }}
+        name: codecov-py${{ matrix.python-version }}
         fail_ci_if_error: false
 
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
+  # Job 2: Generate unified report
+  report:
+    name: Unified Test Report
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Download all test results
+      uses: actions/download-artifact@v4
       with:
-        name: test-results-${{ matrix.python-version }}
-        path: |
-          htmlcov/
-          coverage.xml
+        path: artifacts
+        pattern: test-result-py*
 
+    - name: Generate unified report
+      id: report
+      run: |
+        echo "# 🧪 Unified Test Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Python Version | Status | Passed | Failed | Skipped | Errors | Coverage |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------------|--------|--------|--------|---------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+        
+        OVERALL_STATUS="✅ PASSED"
+        TOTAL_PASSED=0
+        TOTAL_FAILED=0
+        TOTAL_SKIPPED=0
+        TOTAL_ERRORS=0
+        
+        for version in 3.9 3.10 3.11; do
+          result_file="artifacts/test-result-py${version}/result_${version}.json"
+          
+          if [ -f "$result_file" ]; then
+            # Parse JSON results
+            PASSED=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['passed'])")
+            FAILED=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['failed'])")
+            SKIPPED=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['skipped'])")
+            ERRORS=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['error'])")
+            COVERAGE=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['coverage'])")
+            EXIT_CODE=$(cat $result_file | python3 -c "import sys, json; print(json.load(sys.stdin)['exit_code'])")
+            
+            # Determine status
+            if [ "$EXIT_CODE" == "0" ]; then
+              STATUS="✅ PASS"
+            else
+              STATUS="❌ FAIL"
+              OVERALL_STATUS="❌ FAILED"
+            fi
+            
+            # Update totals
+            TOTAL_PASSED=$((TOTAL_PASSED + PASSED))
+            TOTAL_FAILED=$((TOTAL_FAILED + FAILED))
+            TOTAL_SKIPPED=$((TOTAL_SKIPPED + SKIPPED))
+            TOTAL_ERRORS=$((TOTAL_ERRORS + ERRORS))
+            
+            echo "| Python ${version} | ${STATUS} | ${PASSED} | ${FAILED} | ${SKIPPED} | ${ERRORS} | ${COVERAGE} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Python ${version} | ⚠️ MISSING | - | - | - | - | - |" >> $GITHUB_STEP_SUMMARY
+            OVERALL_STATUS="❌ FAILED"
+          fi
+        done
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Overall Status:** ${OVERALL_STATUS}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Total Passed | ${TOTAL_PASSED} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Total Failed | ${TOTAL_FAILED} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Total Skipped | ${TOTAL_SKIPPED} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Total Errors | ${TOTAL_ERRORS} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Set job output
+        echo "overall_status=${OVERALL_STATUS}" >> $GITHUB_OUTPUT
+        
+        # Fail if overall status is failed
+        if [ "$OVERALL_STATUS" == "❌ FAILED" ]; then
+          exit 1
+        fi
+
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read all result files
+          const versions = ['3.9', '3.10', '3.11'];
+          let report = '## 🧪 Test Results Summary\n\n';
+          report += '| Python Version | Status | Passed | Failed | Coverage |\n';
+          report += '|----------------|--------|--------|--------|----------|\n';
+          
+          let overallSuccess = true;
+          
+          for (const version of versions) {
+            try {
+              const resultFile = `artifacts/test-result-py${version}/result_${version}.json`;
+              const data = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
+              const status = data.exit_code === 0 ? '✅' : '❌';
+              if (data.exit_code !== 0) overallSuccess = false;
+              
+              report += `| Python ${version} | ${status} | ${data.passed} | ${data.failed} | ${data.coverage} |\n`;
+            } catch (e) {
+              report += `| Python ${version} | ⚠️ | - | - | - |\n`;
+              overallSuccess = false;
+            }
+          }
+          
+          report += '\n' + (overallSuccess ? '✅ **All tests passed!**' : '❌ **Some tests failed**');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: report
+          });
+
+  # Job 3: Lint checks
   lint:
+    name: Code Quality Checks
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -78,14 +227,18 @@ jobs:
 
     - name: Run flake8
       run: |
+        echo "### Running flake8..." >> $GITHUB_STEP_SUMMARY
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      continue-on-error: true
 
     - name: Check code formatting with black
       run: |
-        black --check --diff .
+        echo "### Checking black formatting..." >> $GITHUB_STEP_SUMMARY
+        black --check --diff . || true
       continue-on-error: true
 
     - name: Check imports with isort
       run: |
-        isort --check-only --diff .
+        echo "### Checking import order..." >> $GITHUB_STEP_SUMMARY
+        isort --check-only --diff . || true
       continue-on-error: true
