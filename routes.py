@@ -581,8 +581,10 @@ def get_data():
         hist['Rsi'] = compute_rsi(hist['Close'])
         hist['Macd'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
 
-        hist_display = hist.dropna(subset=['Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal', 'Histogram'])
-        latest_data_list = clean_df(hist_display,
+        # For AI analysis, use last 30 days of data that has all indicators calculated
+        # (RSI needs 14 days, so we need at least 14 days of history)
+        hist_with_indicators = hist.dropna(subset=['Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal', 'Histogram'])
+        latest_data_list = clean_df(hist_with_indicators.tail(30),
                                     ['Open', 'High', 'Low', 'Close', 'Volume', 'Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal',
                                      'Histogram'])
 
@@ -606,12 +608,19 @@ def get_data():
         lag_date = datetime.now() - timedelta(days=DATA_LAG_DAYS)
         effective_date = hist.index.max().strftime('%Y-%m-%d') if not hist.empty else None
         
+        # For display tables, use data that has the specific indicators available
+        # Don't require ALL indicators to be present - just the ones needed for each table
+        hist_ohlcv = hist.dropna(subset=['Open', 'High', 'Low', 'Close', 'Volume'])
+        hist_ma = hist.dropna(subset=['Ma5', 'Ma10'])
+        hist_rsi = hist.dropna(subset=['Rsi'])
+        hist_macd = hist.dropna(subset=['Macd', 'Signal', 'Histogram'])
+        
         return jsonify(
             ticker=symbol,
-            OHLCV=clean_df(hist_display, ['Open', 'High', 'Low', 'Close', 'Volume']),
-            MA=clean_df(hist_display, ['Ma5', 'Ma10']),
-            RSI=clean_df(hist_display, ['Rsi']),
-            MACD=clean_df(hist_display, ['Macd', 'Signal', 'Histogram']),
+            OHLCV=clean_df(hist_ohlcv, ['Open', 'High', 'Low', 'Close', 'Volume']),
+            MA=clean_df(hist_ma, ['Ma5', 'Ma10']),
+            RSI=clean_df(hist_rsi, ['Rsi']),
+            MACD=clean_df(hist_macd, ['Macd', 'Signal', 'Histogram']),
             AI_Review=gemini_analysis,
             Rule_Based_Analysis=rule_based_text,
             data_source={
