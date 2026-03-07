@@ -9,6 +9,7 @@ from sys import stdout
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_socketio import SocketIO
 from sqlalchemy import text
 
 from config import Config
@@ -53,6 +54,11 @@ def create_app():
         origins=Config.CORS_ORIGINS,
         methods=["GET", "POST", "OPTIONS", "DELETE", "PUT"]
     )
+
+    # Initialize SocketIO for real‑time replay
+    socketio = SocketIO(app, cors_allowed_origins=Config.CORS_ORIGINS)
+    # Expose socketio globally for import by other modules
+    app.socketio = socketio
 
     # Register blueprints
     app.register_blueprint(api, url_prefix='/api')
@@ -132,9 +138,7 @@ def create_app():
         thread.start()
         logger.info("🚀 Background service initialization started (non-blocking)")
     
-    # Trigger background initialization (DISABLED to save memory on free tier)
-    # init_services_background()
-    logger.info("⚠️  Background services (Redis/RAG) initialization disabled to save memory on free tier")
+    init_services_background()
 
     # Request hooks
     @app.before_request
@@ -217,6 +221,14 @@ def create_app():
         logger.info(f" 🌐 Frontend Redirect URL: {Config.CLIENT_REDIRECT_URL}")
         logger.info(f" 🔑 JWT Secrets Loaded: {'✅' if Config.ACCESS_TOKEN_JWT_SECRET and Config.REFRESH_TOKEN_JWT_SECRET else '❌ NOT FOUND'}")
         logger.info("=" * 70)
+
+    # Register SocketIO namespaces (Replay)
+    try:
+        from replay_socket import ReplayNamespace
+        socketio.on_namespace(ReplayNamespace('/replay'))
+        logger.info("Replay SocketIO namespace registered")
+    except Exception as e:
+        logger.error(f"Failed to register Replay namespace: {e}")
 
     return app
     

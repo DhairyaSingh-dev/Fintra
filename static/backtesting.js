@@ -226,6 +226,35 @@ const results = await response.json();
         mcSection.classList.remove('hidden');
     }
     
+    // Show post‑backtest options
+    const optionsDiv = document.getElementById('post-backtest-options');
+    if (optionsDiv) {
+        optionsDiv.classList.remove('hidden');
+    }
+    
+    // Hook option buttons
+    const mcBtn = document.getElementById('opt-mc-btn');
+    if (mcBtn) {
+        mcBtn.addEventListener('click', () => {
+            mcSection?.classList.remove('hidden');
+            mcSection?.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+    const replayBtn = document.getElementById('opt-replay-btn');
+    if (replayBtn) {
+        replayBtn.addEventListener('click', () => {
+            if (window.openReplayModal) {
+                window.openReplayModal();
+            }
+        });
+    }
+    const forwardBtn = document.getElementById('opt-forward-btn');
+    if (forwardBtn) {
+        forwardBtn.addEventListener('click', () => {
+            showNotification('Forward testing not implemented yet.', 'info');
+        });
+    }
+    
     // Initialize Monte Carlo buttons
     import('./monte_carlo.js').then(mc => {
         mc.initializeMonteCarlo();

@@ -39,7 +39,8 @@
             <img id="user-avatar" src="" alt="User Avatar" class="user-avatar">
             <div class="user-details">
                 <div class="user-name" id="user-name"></div>
-            </div> 
+    </div>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
             <button id="logout-btn" class="logout-btn">Logout</button>
         </div>
 
@@ -192,6 +193,17 @@
                 </div>
             </div>
         </div>
+
+        <!-- Post‑Backtest Options -->
+        <div id="post-backtest-options" class="post-backtest-options hidden">
+            <h3>🚀 What would you like to explore next?</h3>
+            <p>Select an analysis path for your backtest results.</p>
+            <div class="option-buttons">
+                <button id="opt-mc-btn" class="option-btn mc-btn-primary">Monte Carlo Analysis</button>
+                <button id="opt-replay-btn" class="option-btn mc-btn-secondary">Live Replay</button>
+                <button id="opt-forward-btn" class="option-btn mc-btn-secondary">Forward Testing (coming soon)</button>
+            </div>
+        </div>
     </div>
 
     <dialog id="add-position-modal" class="add-position-modal">
@@ -260,6 +272,29 @@
             </div>
         </div>
     </div>
+
+    <!-- Live Replay Modal -->
+    <dialog id="replay-modal" class="replay-modal">
+        <h3>📈 Live Replay</h3>
+        <p>Select a 1‑minute window (max 60 min) to replay. Data will be from at least 30 days ago.</p>
+        <div class="replay-controls">
+            <label>Start:&nbsp;<input type="datetime-local" id="replay-start" required></label>
+            <label>End:&nbsp;<input type="datetime-local" id="replay-end" required></label>
+            <label>Speed:&nbsp;
+                <select id="replay-speed">
+                    <option value="0.5">0.5× (slow)</option>
+                    <option value="1" selected>1× (real‑time)</option>
+                    <option value="2">2×</option>
+                    <option value="4">4×</option>
+                </select>
+            </label>
+        </div>
+        <div class="replay-actions">
+            <button id="replay-start-btn" class="mc-btn mc-btn-primary">Start Replay</button>
+            <button id="replay-cancel-btn" class="mc-btn mc-btn-secondary">Cancel</button>
+        </div>
+        <div id="replay-status" class="replay-status"></div>
+    </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script type="module" src="/main.js"></script>

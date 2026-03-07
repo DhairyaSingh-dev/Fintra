@@ -634,6 +634,7 @@ def load_stock_data(symbol: str, apply_lag: bool = True) -> Tuple[Optional[pd.Da
 def fetch_from_yfinance(symbol: str, period: str = "90d", interval: str = "1d") -> Optional[pd.DataFrame]:
     """
     Fetch stock data from yfinance as fallback.
+    Automatically adds .NS suffix for NSE stocks if not present.
     
     Args:
         symbol: Stock symbol to fetch
@@ -648,22 +649,33 @@ def fetch_from_yfinance(symbol: str, period: str = "90d", interval: str = "1d") 
         return None
     
     try:
-        logger.info(f"Fetching {symbol} from yfinance (period={period}, interval={interval})")
-        ticker = yf.Ticker(symbol)
+        # Ensure symbol has .NS suffix for NSE stocks
+        symbol_upper = symbol.upper().strip()
+        if not symbol_upper.endswith('.NS'):
+            symbol_with_suffix = f"{symbol_upper}.NS"
+        else:
+            symbol_with_suffix = symbol_upper
+        
+        logger.info(f"Fetching {symbol_with_suffix} from yfinance (period={period}, interval={interval})")
+        ticker = yf.Ticker(symbol_with_suffix)
         df = ticker.history(period=period, interval=interval)
         
         if df.empty:
-            logger.warning(f"No data returned from yfinance for {symbol}")
+            logger.warning(f"No data returned from yfinance for {symbol_with_suffix}")
             return None
         
         # Standardize column names to lowercase
         df.columns = [col.lower().replace(' ', '_') for col in df.columns]
         
-        logger.info(f"Successfully fetched {len(df)} rows from yfinance for {symbol}")
+        # Convert to PascalCase for consistency with local data
+        df.columns = [col.title().replace('_', '') for col in df.columns]
+        df.index.name = 'Date'
+        
+        logger.info(f"Successfully fetched {len(df)} rows from yfinance for {symbol_with_suffix}")
         return df
         
     except Exception as e:
-        logger.error(f"Error fetching {symbol} from yfinance: {e}")
+        logger.error(f"Error fetching {symbol_with_suffix if 'symbol_with_suffix' in locals() else symbol} from yfinance: {e}")
         return None
 
 

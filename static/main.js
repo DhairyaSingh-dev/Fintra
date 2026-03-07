@@ -11,6 +11,7 @@ import { hideAutocomplete, selectStock } from './autocomplete.js';
 import { initializeMonteCarlo } from './monte_carlo.js';
 import { initializeDataInformatics } from './data_informatics.js';
 import { initializeDataTransparency } from './data_transparency.js';
+import './replay.js';
 
 async function init() {
     log.info('Initializing application...');

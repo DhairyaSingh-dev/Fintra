@@ -4,6 +4,7 @@ Defines all Flask routes and API endpoints.
 """
 import logging
 import os
+import os
 import re
 import secrets
 import traceback
@@ -34,6 +35,7 @@ from analysis import (
 from auth import generate_jwt_token, require_auth, set_token_cookies, verify_jwt_token
 from backtesting import (
     DATA_LAG_DAYS,
+    YFINANCE_AVAILABLE,
     BacktestEngine,
     batch_fetch_prices,
     check_data_availability,
@@ -75,24 +77,71 @@ from validation import (
     validate_symbol,
 )
 
-# Redis and RAG imports
+# Redis and RAG imports with explicit feature flags
 try:
     from rag_engine import init_rag, rag_engine
     from redis_client import ChatCache, DataCache, RateLimiter, init_redis, redis_client
-    REDIS_AVAILABLE = True
+    IMPORT_OK = True
 except ImportError as e:
     logging.warning(f"Redis/RAG modules not available: {e}")
+    IMPORT_OK = False
+
+# Feature flags (override availability if explicitly disabled)
+REDIS_FLAG = os.getenv("ENABLE_REDIS", "true").lower()
+RAG_FLAG = os.getenv("ENABLE_RAG", "true").lower()
+REDIS_ENABLED = REDIS_FLAG in ("1", "true", "yes", "on")
+RAG_ENABLED = RAG_FLAG in ("1", "true", "yes", "on")
+
+# Determine actual availability
+if not IMPORT_OK or not REDIS_ENABLED:
     REDIS_AVAILABLE = False
+else:
+    try:
+        # Ping Redis to verify connectivity
+        REDIS_AVAILABLE = redis_client.is_connected()
+    except Exception:
+        REDIS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 # Create Blueprint for all routes
 api = Blueprint('api', __name__)
 
+# SocketIO namespace for live replay
+from flask_socketio import emit, Namespace, disconnect
+
+
 @api.route('/health', methods=['GET'])
 def health_check():
     """Simple health check endpoint"""
     return jsonify(status='ok', timestamp=datetime.now(timezone.utc).isoformat()), 200
+
+
+# ==================== Admin Flags ====================
+@api.route('/admin/flags', methods=['GET', 'POST'])
+def admin_flags():
+    """Admin endpoint to view or update feature flags at runtime."""
+    from flask import request
+    # Current flags (read from environment to reflect runtime defaults)
+    flags = {
+        'ENABLE_REDIS': os.getenv('ENABLE_REDIS', 'true'),
+        'ENABLE_RAG': os.getenv('ENABLE_RAG', 'true'),
+    }
+    if request.method == 'GET':
+        return jsonify(flags), 200
+    else:
+        data = request.get_json(silent=True) or {}
+        updated = {}
+        for key in ('ENABLE_REDIS','ENABLE_RAG'):
+            if key in data:
+                val = str(data[key]).lower()
+                if val in ('1','true','yes','on'):
+                    os.environ[key] = 'true'
+                    updated[key] = 'true'
+                elif val in ('0','false','no','off'):
+                    os.environ[key] = 'false'
+                    updated[key] = 'false'
+        return jsonify({ 'updated': updated, 'current': flags }), 200
 
 
 # ==================== OAUTH STATE MANAGEMENT ====================
@@ -563,8 +612,26 @@ def get_data():
         )
 
         if hist is None or hist.empty:
-            source_info = f" (source: {metadata.get('source', 'unknown')})" if metadata else ""
-            return jsonify(error=f"Could not retrieve data for {symbol}{source_info}"), 404
+            # Provide detailed error message about fallback attempts
+            error_details = []
+            if metadata:
+                if metadata.get('local_available'):
+                    error_details.append("local data insufficient")
+                else:
+                    error_details.append("no local data")
+                
+                if metadata.get('yfinance_available'):
+                    error_details.append("yfinance fallback attempted but failed")
+                elif not YFINANCE_AVAILABLE:
+                    error_details.append("yfinance not available")
+                else:
+                    error_details.append("yfinance fallback attempted but no data returned")
+                
+                if metadata.get('error'):
+                    error_details.append(f"error: {metadata.get('error')}")
+            
+            error_msg = f"Could not retrieve data for {symbol}. " + "; ".join(error_details) if error_details else f"No data available for {symbol}"
+            return jsonify(error=error_msg), 404
         
         # Log data source for debugging
         logger.info(f"Data loaded for {symbol}: source={metadata.get('source')}, "
@@ -574,6 +641,15 @@ def get_data():
         # Note: Column names are already standardized to PascalCase in load_stock_data
         # hist.columns = [col.title().replace('_', '') for col in hist.columns]
         
+        # Check if we have enough data to calculate indicators
+        # RSI requires 14 days minimum, so we need at least 14 rows
+        if len(hist) < 14:
+            return jsonify(
+                error=f"Insufficient data for {symbol}. Found {len(hist)} rows, need at least 14 for technical indicators. "
+                      f"Data source: {metadata.get('source', 'unknown')}. "
+                      f"Please try again later or contact support if the issue persists."
+            ), 422
+        
         hist['Ma5'] = hist['Close'].rolling(window=5).mean()
         hist['Ma10'] = hist['Close'].rolling(window=10).mean()
         hist['Rsi'] = compute_rsi(hist['Close'])
@@ -582,6 +658,16 @@ def get_data():
         # For AI analysis, use last 30 days of data that has all indicators calculated
         # (RSI needs 14 days, so we need at least 14 days of history)
         hist_with_indicators = hist.dropna(subset=['Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal', 'Histogram'])
+        
+        # Check if we have any data with indicators after dropping NaN
+        if hist_with_indicators.empty:
+            logger.warning(f"No valid indicator data for {symbol} after calculating. Data has {len(hist)} rows but indicators are all NaN.")
+            return jsonify(
+                error=f"Could not calculate technical indicators for {symbol}. The data may be insufficient or corrupted. "
+                      f"Data source: {metadata.get('source', 'unknown')}, rows: {len(hist)}. "
+                      f"Please try a different symbol or contact support."
+            ), 422
+        
         latest_data_list = clean_df(hist_with_indicators.tail(30),
                                     ['Open', 'High', 'Low', 'Close', 'Volume', 'Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal',
                                      'Histogram'])
