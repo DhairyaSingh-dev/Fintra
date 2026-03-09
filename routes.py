@@ -688,14 +688,14 @@ def get_data():
                       f"Please try again later or contact support if the issue persists."
             ), 422
         
-        hist['Ma5'] = hist['Close'].rolling(window=5).mean()
-        hist['Ma10'] = hist['Close'].rolling(window=10).mean()
-        hist['Rsi'] = compute_rsi(hist['Close'])
-        hist['Macd'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
+        hist['MA5'] = hist['Close'].rolling(window=5).mean()
+        hist['MA10'] = hist['Close'].rolling(window=10).mean()
+        hist['RSI'] = compute_rsi(hist['Close'])
+        hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
 
         # For AI analysis, use last 30 days of data that has all indicators calculated
         # (RSI needs 14 days, so we need at least 14 days of history)
-        hist_with_indicators = hist.dropna(subset=['Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal', 'Histogram'])
+        hist_with_indicators = hist.dropna(subset=['MA5', 'MA10', 'RSI', 'MACD', 'Signal', 'Histogram'])
         
         # Check if we have any data with indicators after dropping NaN
         if hist_with_indicators.empty:
@@ -707,7 +707,7 @@ def get_data():
             ), 422
         
         latest_data_list = clean_df(hist_with_indicators.tail(30),
-                                    ['Open', 'High', 'Low', 'Close', 'Volume', 'Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal',
+                                    ['Open', 'High', 'Low', 'Close', 'Volume', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal',
                                      'Histogram'])
 
         latest_symbol_data[symbol] = latest_data_list
@@ -733,16 +733,16 @@ def get_data():
         # For display tables, use data that has the specific indicators available
         # Don't require ALL indicators to be present - just the ones needed for each table
         hist_ohlcv = hist.dropna(subset=['Open', 'High', 'Low', 'Close', 'Volume'])
-        hist_ma = hist.dropna(subset=['Ma5', 'Ma10'])
-        hist_rsi = hist.dropna(subset=['Rsi'])
-        hist_macd = hist.dropna(subset=['Macd', 'Signal', 'Histogram'])
+        hist_ma = hist.dropna(subset=['MA5', 'MA10'])
+        hist_rsi = hist.dropna(subset=['RSI'])
+        hist_macd = hist.dropna(subset=['MACD', 'Signal', 'Histogram'])
         
         return jsonify(
             ticker=symbol,
             OHLCV=clean_df(hist_ohlcv, ['Open', 'High', 'Low', 'Close', 'Volume']),
-            MA=clean_df(hist_ma, ['Ma5', 'Ma10']),
-            RSI=clean_df(hist_rsi, ['Rsi']),
-            MACD=clean_df(hist_macd, ['Macd', 'Signal', 'Histogram']),
+            MA=clean_df(hist_ma, ['MA5', 'MA10']),
+            RSI=clean_df(hist_rsi, ['RSI']),
+            MACD=clean_df(hist_macd, ['MACD', 'Signal', 'Histogram']),
             AI_Review=gemini_analysis,
             Rule_Based_Analysis=rule_based_text,
             data_source={
@@ -1143,15 +1143,15 @@ def get_portfolio():
                     raise ValueError(f"History is empty after dropping NaNs for {p.symbol}")
 
                 # Calculate indicators
-                hist['Rsi'] = compute_rsi(hist['Close'])
-                hist['Ma5'] = hist['Close'].rolling(window=5).mean()
-                hist['Ma10'] = hist['Close'].rolling(window=10).mean()
-                hist['Macd'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
+                hist['RSI'] = compute_rsi(hist['Close'])
+                hist['MA5'] = hist['Close'].rolling(window=5).mean()
+                hist['MA10'] = hist['Close'].rolling(window=10).mean()
+                hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
                 
                 latest = hist.iloc[-1]
                 current_price = latest['Close']
                 
-                hist_list_for_macd = clean_df(hist.dropna(subset=['Macd', 'Signal']), ['Macd', 'Signal'])
+                hist_list_for_macd = clean_df(hist.dropna(subset=['MACD', 'Signal']), ['MACD', 'Signal'])
                 crossover_type, crossover_days_ago = find_recent_macd_crossover(hist_list_for_macd, lookback=7)
                 macd_status = "None"
                 if crossover_type != 'none':
@@ -1181,9 +1181,9 @@ def get_portfolio():
                     "current_value": current_value,
                     "pnl": pnl,
                     "pnl_percent": pnl_percent,
-                    "rsi": latest.get('Rsi'),
-                    "ma5": latest.get('Ma5'),
-                    "ma10": latest.get('Ma10'),
+                    "rsi": latest.get('RSI'),
+                    "ma5": latest.get('MA5'),
+                    "ma10": latest.get('MA10'),
                     "macd_status": macd_status,
                     "chart_data": chart_data,
                     "data_date": latest_date,  # Include the date of the data for transparency
