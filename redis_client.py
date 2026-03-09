@@ -45,12 +45,13 @@ class RedisClient:
         return cls._instance
     
     def connect(self) -> redis.Redis:
-        """Initialize Redis connection with Render.com support"""
+        """Initialize Redis connection with Upstash & Render support"""
         if self._client is None:
             try:
-                # Detect if running on Render (Render uses Redis Cloud with SSL)
-                is_render = 'render.com' in RedisConfig.HOST or RedisConfig.PORT == 6379 and RedisConfig.PASSWORD
-                
+                # 1. Force SSL for Upstash (it's mandatory)
+                # You can also detect it via host: is_upstash = "upstash.io" in RedisConfig.HOST
+                use_ssl = True 
+
                 connection_params = {
                     'host': RedisConfig.HOST,
                     'port': RedisConfig.PORT,
@@ -59,24 +60,27 @@ class RedisClient:
                     'decode_responses': True,
                     'socket_connect_timeout': 5,
                     'socket_timeout': 5,
+                    # Essential for keeping connections alive on Render/Serverless
                     'health_check_interval': 30,
                     'socket_keepalive': True,
+                    'retry_on_timeout': True,
                 }
-                
-                # Render's Redis requires SSL
-                if is_render or RedisConfig.PORT == 6379:
-                    connection_params['ssl'] = True
-                    connection_params['ssl_cert_reqs'] = None  # For Render's internal network
-                    logger.info("🔒 Using SSL connection for Redis")
-                
+
+                if use_ssl:
+                    connection_params.update({
+                        'ssl': True,
+                        'ssl_cert_reqs': "none", # String "none" is safer than NoneType
+                    })
+                    logger.info(f"🔒 SSL enabled for Redis at {RedisConfig.HOST}")
+
                 self._client = redis.Redis(**connection_params)
                 
                 # Test connection
                 self._client.ping()
-                logger.info(f"✅ Redis connection established to {RedisConfig.HOST}:{RedisConfig.PORT}")
+                logger.info("✅ Redis connection established")
+                
             except Exception as e:
                 logger.error(f"❌ Redis connection failed: {e}")
-                logger.error(f"   Host: {RedisConfig.HOST}, Port: {RedisConfig.PORT}")
                 self._client = None
                 raise
         return self._client
