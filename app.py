@@ -140,26 +140,42 @@ def create_app():
     
     init_services_background()
 
-    # Request hooks
+    # ==================== BULLETPROOF CORS ====================
+    # Flask-CORS can silently fail if middleware order or error handlers interfere.
+    # These hooks guarantee CORS headers on EVERY response, no matter what.
+    
+    allowed_origins = set(Config.CORS_ORIGINS)
+
     @app.before_request
-    def before_request_logging():
-        """Log request details and incoming cookies for debugging."""
+    def handle_preflight_and_logging():
+        """Handle OPTIONS preflight immediately + log requests."""
+        origin = request.headers.get('Origin', '')
+        
         if request.method == 'OPTIONS':
-            logger.info(f"Received PREFLIGHT {request.method} request for {request.path}")
-        elif not request.path.endswith('/health'):
-            # Log cookies and origin for all non-health API requests
-            logger.info(f"📥 [{request.method}] {request.path} | Origin: {request.headers.get('Origin', 'None')}")
+            # Immediately respond to preflight — don't let it reach any route or error handler
+            logger.info(f"✈️ PREFLIGHT {request.path} | Origin: {origin}")
+            resp = app.make_default_options_response()
+            if origin in allowed_origins:
+                resp.headers['Access-Control-Allow-Origin'] = origin
+                resp.headers['Access-Control-Allow-Credentials'] = 'true'
+                resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, DELETE, PUT'
+                resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+                resp.headers['Access-Control-Max-Age'] = '3600'
+            return resp
+        
+        if not request.path.endswith('/health'):
+            logger.info(f"📥 [{request.method}] {request.path} | Origin: {origin or 'None'}")
             logger.info(f"   🔑 Incoming Cookies: {list(request.cookies.keys())}")
 
     @app.after_request
     def ensure_cors_headers(response):
-        """Ensure CORS headers are ALWAYS present, even on error responses."""
-        origin = request.headers.get('Origin')
-        if origin and origin in Config.CORS_ORIGINS:
+        """Stamp CORS headers on EVERY response — error, success, redirect, anything."""
+        origin = request.headers.get('Origin', '')
+        if origin in allowed_origins:
             response.headers['Access-Control-Allow-Origin'] = origin
             response.headers['Access-Control-Allow-Credentials'] = 'true'
             response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, DELETE, PUT'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
         return response
 
     # Error handlers
