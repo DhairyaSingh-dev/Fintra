@@ -151,6 +151,17 @@ def create_app():
             logger.info(f"📥 [{request.method}] {request.path} | Origin: {request.headers.get('Origin', 'None')}")
             logger.info(f"   🔑 Incoming Cookies: {list(request.cookies.keys())}")
 
+    @app.after_request
+    def ensure_cors_headers(response):
+        """Ensure CORS headers are ALWAYS present, even on error responses."""
+        origin = request.headers.get('Origin')
+        if origin and origin in Config.CORS_ORIGINS:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, DELETE, PUT'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        return response
+
     # Error handlers
     @app.errorhandler(Exception)
     def handle_exception(e):
