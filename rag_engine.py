@@ -289,8 +289,8 @@ class RAGEngine:
             if not client:
                 return {"error": "Redis not connected"}
             
-            # Count documents
-            doc_count = len(client.keys("doc:*"))
+            # Count documents (use SCAN instead of KEYS — Upstash blocks KEYS)
+            doc_count = sum(1 for _ in client.scan_iter(match="doc:*", count=100))
             
             return {
                 "index_name": self.index_name,
@@ -324,7 +324,7 @@ class RAGEngine:
             if not client:
                 return False
             
-            doc_keys = client.keys("doc:*")
+            doc_keys = list(client.scan_iter(match="doc:*", count=100))
             if doc_keys:
                 client.delete(*doc_keys)
                 logger.info(f"Cleared {len(doc_keys)} documents from index")

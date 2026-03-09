@@ -1,8 +1,8 @@
 import logging
 import threading
 import time
-from flask_socketio import Namespace, emit, disconnect, request
-from flask import request as flask_request
+from flask_socketio import Namespace, emit, disconnect
+from flask import request
 from replay import get_one_min_candles
 
 logger = logging.getLogger(__name__)
