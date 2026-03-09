@@ -68,17 +68,24 @@ def check_data_availability(symbol: str = None) -> Dict:
         first_date = df.index.min()
         last_date = df.index.max()
         lag_date = get_data_lag_date()
-        effective_date = min(last_date, lag_date)
+        
+        # Ensure lag_date matches last_date timezone for correct comparison
+        lag_ts = pd.Timestamp(lag_date)
+        if getattr(last_date, 'tzinfo', None) is not None or getattr(last_date, 'tz', None) is not None:
+            tz = getattr(last_date, 'tz', getattr(last_date, 'tzinfo', None))
+            lag_ts = lag_ts.tz_localize(tz)
+            
+        effective_date = min(last_date, lag_ts)
         
         # Calculate if manual lag is needed
-        needs_lag = lag_date > last_date
-        days_behind = (lag_date - last_date).days if needs_lag else 0
+        needs_lag = lag_ts > last_date
+        days_behind = (lag_ts - last_date).days if needs_lag else 0
         
         return {
             'available': True,
             'first_date': first_date.strftime('%Y-%m-%d'),
             'last_date': last_date.strftime('%Y-%m-%d'),
-            'lag_date': lag_date.strftime('%Y-%m-%d'),
+            'lag_date': lag_ts.strftime('%Y-%m-%d'),
             'effective_last_date': effective_date.strftime('%Y-%m-%d'),
             'needs_manual_lag': needs_lag,
             'days_behind_lag': days_behind,
@@ -118,7 +125,13 @@ def apply_sebi_lag(df: pd.DataFrame) -> pd.DataFrame:
     
     lag_date = get_data_lag_date()
     original_count = len(df)
-    filtered_df = df[df.index <= lag_date].copy()
+    
+    # Handle timezone differences between df.index and naive lag_date
+    lag_ts = pd.Timestamp(lag_date)
+    if getattr(df.index, 'tz', None) is not None:
+        lag_ts = lag_ts.tz_localize(df.index.tz)
+        
+    filtered_df = df[df.index <= lag_ts].copy()
     
     if len(filtered_df) < original_count:
         logger.info(f"Applied {DATA_LAG_DAYS}-day SEBI lag: excluded {original_count - len(filtered_df)} rows")
@@ -663,6 +676,10 @@ def fetch_from_yfinance(symbol: str, period: str = "90d", interval: str = "1d") 
         if df.empty:
             logger.warning(f"No data returned from yfinance for {symbol_with_suffix}")
             return None
+            
+        # Strip timezone to ensure compatibility with local naive datetimes
+        if getattr(df.index, 'tz', None) is not None:
+            df.index = df.index.tz_localize(None)
         
         # Standardize column names to lowercase
         df.columns = [col.lower().replace(' ', '_') for col in df.columns]
