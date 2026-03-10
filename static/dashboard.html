@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -164,21 +165,70 @@
             <div id="backtesting-error" class="error" style="display: none;"></div>
             <div id="backtesting-results" class="backtesting-results" style="display: none;"></div>
             
-            <!-- Monte Carlo Analysis Section -->
+            <!-- Advanced Institutional Monte Carlo Analysis Section -->
             <div id="monte-carlo-section" class="monte-carlo-section hidden">
-                <h3>🎲 Monte Carlo Analysis</h3>
-                <p class="mc-description">Determine if your strategy's performance is due to skill or luck</p>
+                <h3>🎲 Quantitative Monte Carlo Engine</h3>
+                <p class="mc-description">Advanced stochastic modeling via Client-Side WebAssembly</p>
                 
+                <div class="quant-params-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                    <!-- Base Dynamics -->
+                    <div class="quant-panel">
+                        <h4>Base Dynamics</h4>
+                        <div class="param-group">
+                            <label>Annualized Drift (μ)</label>
+                            <input type="number" id="mc-mu" value="0.05" step="0.01">
+                        </div>
+                        <div class="param-group">
+                            <label>Base Volatility (σ)</label>
+                            <input type="number" id="mc-vol" value="0.20" step="0.01">
+                        </div>
+                    </div>
+                    
+                    <!-- Heston Stochastic Volatility -->
+                    <div class="quant-panel">
+                        <h4>Heston Volatility <input type="checkbox" id="mc-use-heston"></h4>
+                        <div class="param-group">
+                            <label>Mean Reversion (κ)</label>
+                            <input type="number" id="mc-kappa" value="2.0" step="0.1">
+                        </div>
+                        <div class="param-group">
+                            <label>Vol of Vol (ξ)</label>
+                            <input type="number" id="mc-xi" value="0.1" step="0.05">
+                        </div>
+                        <div class="param-group">
+                            <label>Correlation (ρ)</label>
+                            <input type="number" id="mc-rho" value="-0.5" step="0.1">
+                        </div>
+                    </div>
+
+                    <!-- Merton Jump-Diffusion -->
+                    <div class="quant-panel">
+                        <h4>Poisson Jumps <input type="checkbox" id="mc-use-jumps"></h4>
+                        <div class="param-group">
+                            <label>Jump Intensity (λ)</label>
+                            <input type="number" id="mc-lambda" value="0.5" step="0.1">
+                        </div>
+                        <div class="param-group">
+                            <label>Mean Jump (μ_J)</label>
+                            <input type="number" id="mc-mu-j" value="-0.05" step="0.01">
+                        </div>
+                        <div class="param-group">
+                            <label>Jump Vol (σ_J)</label>
+                            <input type="number" id="mc-sigma-j" value="0.1" step="0.01">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="mc-controls">
                     <button id="mc-quick-btn" class="mc-btn mc-btn-secondary" type="button">
                         <span class="mc-btn-icon">⚡</span>
-                        <span class="mc-btn-text">Quick Analysis</span>
-                        <span class="mc-btn-sub">1,000 simulations</span>
+                        <span class="mc-btn-text">Standard Simulation</span>
+                        <span class="mc-btn-sub">1,000 paths</span>
                     </button>
                     <button id="mc-full-btn" class="mc-btn mc-btn-primary" type="button">
                         <span class="mc-btn-icon">🔬</span>
-                        <span class="mc-btn-text">Full Analysis</span>
-                        <span class="mc-btn-sub">10,000 simulations</span>
+                        <span class="mc-btn-text">Institutional Simulation</span>
+                        <span class="mc-btn-sub">10,000 paths (WASM)</span>
                     </button>
                 </div>
                 

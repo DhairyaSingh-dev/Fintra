@@ -9,19 +9,19 @@ let currentMode = 'beginner';
 
 export function initializeBacktesting() {
     const { DOM } = deps;
-    
+
     DOM.backtestingTabBtn?.addEventListener('click', showBacktestingView);
-    
+
     DOM.beginnerModeBtn?.addEventListener('click', () => setMode('beginner'));
     DOM.advancedModeBtn?.addEventListener('click', () => setMode('advanced'));
-    
+
     DOM.backtestingForm?.addEventListener('submit', handleBacktestSubmit);
     DOM.clearBacktestingBtn?.addEventListener('click', () => {
         DOM.backtestingSymbol.value = '';
         handleBacktestingInput({ target: DOM.backtestingSymbol });
         hideAutocomplete(DOM.backtestingAutocomplete);
     });
-    
+
     DOM.backtestingSymbol.addEventListener('input', handleBacktestingInput);
     DOM.backtestingSymbol.addEventListener('keydown', (e) => handleAutocompleteKeydown(e, DOM.backtestingAutocomplete));
     DOM.backtestingSymbol.addEventListener('blur', () => {
@@ -31,16 +31,16 @@ export function initializeBacktesting() {
             if (symbol) fetchDateRange(symbol);
         }, 200);
     });
-    
+
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.input-wrapper')) {
             hideAutocomplete(DOM.backtestingAutocomplete);
         }
     });
-    
+
     // Override the selectStock function to also fetch date range
     const originalSelectStock = window.selectStock;
-    window.selectStock = function(symbol) {
+    window.selectStock = function (symbol) {
         if (originalSelectStock) originalSelectStock(symbol);
         // Also update backtest symbol if visible
         if (DOM.backtestingSymbol && document.getElementById('backtesting-view')?.style.display !== 'none') {
@@ -48,7 +48,7 @@ export function initializeBacktesting() {
             fetchDateRange(symbol);
         }
     };
-    
+
     setDefaultDateRange();
 }
 
@@ -60,7 +60,7 @@ function handleBacktestingInput(e) {
 
 function setMode(mode) {
     currentMode = mode;
-    
+
     if (mode === 'beginner') {
         if (DOM.beginnerModeBtn) DOM.beginnerModeBtn.classList.add('active');
         if (DOM.advancedModeBtn) DOM.advancedModeBtn.classList.remove('active');
@@ -77,12 +77,12 @@ let availableDateRange = null;
 
 async function fetchDateRange(symbol) {
     if (!symbol) return;
-    
+
     try {
         const response = await fetch(`${CONFIG.API_BASE_URL}/stock/${symbol}/date_range`, {
             headers: getAuthHeaders()
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             availableDateRange = data;
@@ -96,14 +96,14 @@ async function fetchDateRange(symbol) {
 
 function updateDateInputs(dateRange) {
     if (!dateRange) return;
-    
+
     // Set start date to first available date
     if (DOM.startDate) {
         DOM.startDate.min = dateRange.first_date;
         DOM.startDate.max = dateRange.last_date;
         DOM.startDate.value = dateRange.first_date;
     }
-    
+
     // Set end date to last available date (already has 31-day lag applied in backend)
     if (DOM.endDate) {
         DOM.endDate.min = dateRange.first_date;
@@ -116,11 +116,11 @@ function showDateRangeInfo(dateRange) {
     // Remove existing info
     let existingInfo = document.getElementById('date-range-info');
     if (existingInfo) existingInfo.remove();
-    
+
     // Add date range info banner
     const form = DOM.backtestingForm;
     if (!form) return;
-    
+
     const infoDiv = document.createElement('div');
     infoDiv.id = 'date-range-info';
     infoDiv.className = 'date-range-info-banner';
@@ -134,7 +134,7 @@ function showDateRangeInfo(dateRange) {
             </div>
         </div>
     `;
-    
+
     form.insertBefore(infoDiv, form.firstChild);
 }
 
@@ -144,124 +144,177 @@ function setDefaultDateRange() {
     if (DOM.endDate) DOM.endDate.value = '';
 }
 
+let pyodideBacktestPromise = null;
+
+async function initBacktestPyodide() {
+    if (!pyodideBacktestPromise) {
+        pyodideBacktestPromise = (async () => {
+            showNotification('Initializing Pyodide Backtest Engine...', 'info');
+            // 'loadPyodide' is globally available from the script tag in dashboard.html
+            const pyodide = await loadPyodide();
+            showNotification('Installing Pandas to WebAssembly (~15MB)...', 'info');
+            await pyodide.loadPackage("pandas");
+
+            showNotification('Loading Fintra Backtest Engine...', 'info');
+            const response = await fetch('/static/py_backtest_engine.py');
+            const pythonCode = await response.text();
+
+            // Execute the python script
+            await pyodide.runPythonAsync(pythonCode);
+            showNotification('Backtest Engine Ready!', 'success');
+            return pyodide;
+        })();
+    }
+    return pyodideBacktestPromise;
+}
+
 async function handleBacktestSubmit(e) {
     e.preventDefault();
-    
+
     const symbol = DOM.backtestingSymbol.value.trim().toUpperCase();
     if (!symbol) {
         showNotification('Please enter a stock symbol', 'error');
         return;
     }
-    
+
     const formData = new FormData(DOM.backtestingForm);
     const params = Object.fromEntries(formData.entries());
-    
+
     // Use available date range if no dates selected or invalid dates
     let startDate = params.start_date;
     let endDate = params.end_date;
-    
+
     if (!startDate && availableDateRange) {
         startDate = availableDateRange.first_date;
     }
     if (!endDate && availableDateRange) {
         endDate = availableDateRange.last_date;
     }
-    
-    const backtestData = {
+
+    const backtestConfig = {
         symbol: symbol,
         strategy: params.strategy,
-        initial_balance: parseFloat(params.initial_balance),
+        initial_balance: parseFloat(params.initial_balance) || 100000,
         start_date: startDate,
         end_date: endDate,
         mode: currentMode,
-        atr_multiplier: currentMode === 'advanced' ? parseFloat(params.atr_multiplier) : 3.0,
-        risk_per_trade: currentMode === 'advanced' ? parseFloat(params.risk_per_trade) / 100 : 0.02
+        atr_multiplier: currentMode === 'advanced' ? parseFloat(params.atr_multiplier) || 3.0 : 3.0,
+        risk_per_trade: currentMode === 'advanced' ? (parseFloat(params.risk_per_trade) / 100 || 0.02) : 0.02
     };
-    
+
     showLoading();
     hideError();
     hideResults();
-    
+
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/backtest`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
-            },
-            credentials: 'include',
-            body: JSON.stringify(backtestData)
+        // Fetch raw stock history data
+        const dataResponse = await fetch(`${CONFIG.API_BASE_URL}/stock/${symbol}/history`, {
+            headers: getAuthHeaders()
         });
-        
-        if (!response.ok) {
-            if (response.status === 401) {
+
+        if (!dataResponse.ok) {
+            if (dataResponse.status === 401) {
                 showNotification('Session expired. Please sign in again.', 'error');
                 handleLogout(false);
                 return;
             }
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to run backtest');
+            const err = await dataResponse.json();
+            throw new Error(err.error || "Failed to fetch stock history data.");
         }
-        
-const results = await response.json();
-    
-    // Store results for Monte Carlo
-    window.currentBacktestData = {
-        ...backtestData,
-        trades: results.trades || [],
-        prices: results.prices || [],
-        strategy_return_pct: results.strategy_return_pct || 0,
-        sharpe_ratio: results.sharpe_ratio || 0,
-        max_drawdown_pct: results.max_drawdown_pct || 0,
-        final_portfolio_value: results.final_portfolio_value || 0,
-        initial_balance: backtestData.initial_balance
-    };
-    
-    displayBacktestResults(results, backtestData);
-    showNotification('Backtest completed successfully!', 'success');
-    
-    // Show Monte Carlo section
-    const mcSection = document.getElementById('monte-carlo-section');
-    if (mcSection) {
-        mcSection.classList.remove('hidden');
-    }
-    
-    // Show post‑backtest options
-    const optionsDiv = document.getElementById('post-backtest-options');
-    if (optionsDiv) {
-        optionsDiv.classList.remove('hidden');
-    }
-    
-    // Hook option buttons
-    const mcBtn = document.getElementById('opt-mc-btn');
-    if (mcBtn) {
-        mcBtn.addEventListener('click', () => {
-            mcSection?.classList.remove('hidden');
-            mcSection?.scrollIntoView({ behavior: 'smooth' });
-        });
-    }
-    const replayBtn = document.getElementById('opt-replay-btn');
-    if (replayBtn) {
-        replayBtn.addEventListener('click', () => {
-            if (window.openReplayModal) {
-                window.openReplayModal();
+
+        const dataJson = await dataResponse.json();
+
+        // Ensure data is available
+        if (!dataJson.data || dataJson.data.length === 0) {
+            throw new Error('No historical data available for backtesting.');
+        }
+
+        // Initialize Python WASM runtime
+        const pyodide = await initBacktestPyodide();
+        const pyConfig = pyodide.toPy(backtestConfig);
+
+        // We pass the data JSON array string to avoid huge JS-to-Py bridging
+        const historicalDataStr = JSON.stringify(dataJson.data);
+
+        // Execute Python backtest natively in JS!
+        const resultJsonString = pyodide.globals.get('run_backtest_browser')(historicalDataStr, pyConfig);
+        const results = JSON.parse(resultJsonString);
+        pyConfig.destroy(); // Free memory
+
+        if (results.error === true) {
+            throw new Error(results.message || "Failed to run backtest in WASM.");
+        }
+
+        // Optional JS-based fallback AI analysis logic could be added here
+        results.ai_analysis = "AI Analysis is disabled in client-side WebAssembly execution. Historical data has been parsed and computed locally on your device.";
+
+        // Store results for Monte Carlo
+        window.currentBacktestData = {
+            ...backtestConfig,
+            trades: results.trades || [],
+            prices: dataJson.data || [], // Supply prices to Monte Carlo if needed
+            strategy_return_pct: results.strategy_return_pct || 0,
+            sharpe_ratio: results.sharpe_ratio || 0,
+            max_drawdown_pct: results.max_drawdown_pct || 0,
+            final_portfolio_value: results.final_portfolio_value || 0
+        };
+
+        displayBacktestResults(results, backtestConfig);
+        showNotification('Client-Side Backtest completed successfully!', 'success');
+
+        // Show Monte Carlo section
+        const mcSection = document.getElementById('monte-carlo-section');
+        if (mcSection) {
+            mcSection.classList.remove('hidden');
+        }
+
+        // Show post-backtest options
+        const optionsDiv = document.getElementById('post-backtest-options');
+        if (optionsDiv) {
+            optionsDiv.classList.remove('hidden');
+        }
+
+        // Hook option buttons
+        const mcBtn = document.getElementById('opt-mc-btn');
+        if (mcBtn) {
+            // Cleanup existing listeners if any
+            const newBtn = mcBtn.cloneNode(true);
+            mcBtn.parentNode.replaceChild(newBtn, mcBtn);
+            newBtn.addEventListener('click', () => {
+                mcSection?.classList.remove('hidden');
+                mcSection?.scrollIntoView({ behavior: 'smooth' });
+            });
+        }
+
+        const replayBtn = document.getElementById('opt-replay-btn');
+        if (replayBtn) {
+            const newReplay = replayBtn.cloneNode(true);
+            replayBtn.parentNode.replaceChild(newReplay, replayBtn);
+            newReplay.addEventListener('click', () => {
+                if (window.openReplayModal) {
+                    window.openReplayModal();
+                }
+            });
+        }
+
+        const forwardBtn = document.getElementById('opt-forward-btn');
+        if (forwardBtn) {
+            const newFwd = forwardBtn.cloneNode(true);
+            forwardBtn.parentNode.replaceChild(newFwd, forwardBtn);
+            newFwd.addEventListener('click', () => {
+                showNotification('Forward testing not implemented yet.', 'info');
+            });
+        }
+
+        // Initialize Monte Carlo buttons
+        import('./monte_carlo.js').then(mc => {
+            if (typeof mc.initializeMonteCarlo === 'function') {
+                mc.initializeMonteCarlo();
             }
+        }).catch(err => {
+            console.error('Failed to load Monte Carlo module:', err);
         });
-    }
-    const forwardBtn = document.getElementById('opt-forward-btn');
-    if (forwardBtn) {
-        forwardBtn.addEventListener('click', () => {
-            showNotification('Forward testing not implemented yet.', 'info');
-        });
-    }
-    
-    // Initialize Monte Carlo buttons
-    import('./monte_carlo.js').then(mc => {
-        mc.initializeMonteCarlo();
-    }).catch(err => {
-        console.error('Failed to load Monte Carlo module:', err);
-    });
-        
+
     } catch (error) {
         console.error('❌ Backtest error:', error);
         showError(error.message);
@@ -274,19 +327,19 @@ const results = await response.json();
 function displayBacktestResults(results, params) {
     const container = DOM.backtestingResults;
     if (!container) return;
-    
+
     container.style.display = 'block';
-    
+
     const roiClass = results.strategy_return_pct >= 0 ? 'positive' : 'negative';
     const marketRoiClass = results.market_return_pct >= 0 ? 'positive' : 'negative';
     const roiSign = results.strategy_return_pct >= 0 ? '+' : '';
     const marketRoiSign = results.market_return_pct >= 0 ? '+' : '';
-    
+
     const trades = results.trades || [];
     const winningTrades = trades.filter(t => t.result === 'Win').length;
     const losingTrades = trades.filter(t => t.result === 'Loss').length;
     const winRate = trades.length > 0 ? (winningTrades / trades.length * 100).toFixed(1) : 0;
-    
+
     let aiSummary = '';
     if (results.ai_analysis) {
         const aiHtml = marked.parse(results.ai_analysis);
@@ -297,7 +350,7 @@ function displayBacktestResults(results, params) {
             </div>
         `;
     }
-    
+
     let tradesSection = '';
     if (trades.length > 0) {
         tradesSection = `
@@ -358,7 +411,7 @@ function displayBacktestResults(results, params) {
             </div>
         `;
     }
-    
+
     container.innerHTML = `
         <div class="backtest-results-container">
             <div class="backtest-summary">
@@ -371,7 +424,7 @@ function displayBacktestResults(results, params) {
                 <div class="metrics-grid">
                     <div class="metric-card primary">
                         <div class="metric-label">Strategy Final Value</div>
-                        <div class="metric-value">₹${results.final_portfolio_value.toLocaleString('en-IN', {maximumFractionDigits: 2})}</div>
+                        <div class="metric-value">₹${results.final_portfolio_value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
                         <div class="metric-change ${roiClass}">
                             ${roiSign}${results.strategy_return_pct.toFixed(2)}% ROI
                         </div>
@@ -379,7 +432,7 @@ function displayBacktestResults(results, params) {
                     
                     <div class="metric-card secondary">
                         <div class="metric-label">Buy & Hold Value</div>
-                        <div class="metric-value">₹${results.market_buy_hold_value.toLocaleString('en-IN', {maximumFractionDigits: 2})}</div>
+                        <div class="metric-value">₹${results.market_buy_hold_value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
                         <div class="metric-change ${marketRoiClass}">
                             ${marketRoiSign}${results.market_return_pct.toFixed(2)}% ROI
                         </div>
@@ -410,7 +463,7 @@ let loadingInterval = null;
 function showLoading() {
     if (DOM.backtestingLoading) {
         DOM.backtestingLoading.style.display = 'flex';
-        
+
         // Dynamic loading messages
         const messages = [
             "🔄 Initializing backtest engine...",
@@ -421,13 +474,13 @@ function showLoading() {
             "🤖 Generating AI strategy analysis...",
             "✨ Almost there, finalizing results..."
         ];
-        
+
         let messageIndex = 0;
         const loadingText = DOM.backtestingLoading.querySelector('.loading-text');
-        
+
         if (loadingText) {
             loadingText.textContent = messages[0];
-            
+
             // Cycle through messages every 3 seconds
             loadingInterval = setInterval(() => {
                 messageIndex = (messageIndex + 1) % messages.length;
@@ -441,7 +494,7 @@ function hideLoading() {
     if (DOM.backtestingLoading) {
         DOM.backtestingLoading.style.display = 'none';
     }
-    
+
     // Clear the interval
     if (loadingInterval) {
         clearInterval(loadingInterval);
@@ -472,7 +525,7 @@ function showBacktestingView() {
     DOM.searchView.style.display = 'none';
     DOM.portfolioView.style.display = 'none';
     DOM.backtestingView.style.display = 'block';
-    
+
     DOM.searchTabBtn?.classList.remove('active');
     DOM.portfolioTabBtn?.classList.remove('active');
     DOM.backtestingTabBtn?.classList.add('active');

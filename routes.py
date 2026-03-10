@@ -1363,6 +1363,37 @@ def delete_position(position_id):
     db.session.commit()
     return jsonify(message="Position deleted successfully"), 200
 
+@api.route('/stock/<symbol>/history', methods=['GET'])
+def stock_history(symbol):
+    """
+    Return SEBI-lagged historical data for the requested stock
+    to be used by client-side Pyodide computation.
+    """
+    auth_response = require_auth()
+    if auth_response: return auth_response
+
+    is_valid, error_msg = validate_symbol(symbol.strip())
+    if not is_valid:
+        return jsonify(error=error_msg), 400
+
+    try:
+        df, compliance_info = load_stock_data(symbol, apply_lag=True)
+        if df is None:
+            return jsonify(error=f"Data not found for symbol {symbol}."), 404
+
+        # Convert index to string for JSON serialization
+        df_json = df.reset_index()
+        df_json['Date'] = df_json['Date'].dt.strftime('%Y-%m-%d')
+        data = df_json.to_dict(orient='records')
+        
+        return jsonify(
+            data=data,
+            compliance=compliance_info
+        ), 200
+    except Exception as e:
+        logger.error(f"Error fetching historical data for {symbol}: {e}")
+        return jsonify(error="Failed to fetch historical data"), 500
+
 @api.route('/backtest', methods=['POST'])
 def run_backtest():
     """
@@ -1442,6 +1473,9 @@ def run_backtest():
         df, compliance_info = load_stock_data(symbol, apply_lag=True)
         if df is None:
             return jsonify(error=f"Data not found for symbol {symbol}. Please check if it's a valid Indian stock."), 404
+            
+        # Add new endpoint here instead of inside the backtest endpoint body
+        # Let's fix this in the exact same spot it matched or place it right before run_backtest.
         
         # Get available date range from the data
         available_first_date = df.index.min().strftime('%Y-%m-%d')
@@ -1558,162 +1592,9 @@ quantitative decomposition of HISTORICAL backtest data. This is pure historical 
     
 
 
-@api.route('/backtest/monte_carlo', methods=['POST'])
-def run_monte_carlo():
-    """
-    Run Monte Carlo simulation analysis on backtest results with input validation.
-
-    This endpoint analyzes whether backtest results are due to luck or skill
-    by running thousands of randomized simulations.
-    """
-    auth_response = require_auth()
-    if auth_response:
-        return auth_response
-
-    data = request.get_json()
-    if not data:
-        return jsonify(error="Request body is required"), 400
-
-    validation_errors = []
-    
-    # Required parameters
-    trades = data.get('trades', [])
-    prices = data.get('prices', [])
-    
-    # Validate trades is a list with at least 2 items
-    if not isinstance(trades, list):
-        validation_errors.append("Trades must be an array")
-    elif len(trades) < 2:
-        validation_errors.append("At least 2 trades required for Monte Carlo analysis")
-    elif len(trades) > 10000:
-        validation_errors.append("Maximum 10,000 trades allowed")
-    
-    # Validate prices is a list if provided
-    if prices and not isinstance(prices, list):
-        validation_errors.append("Prices must be an array")
-    elif prices and len(prices) > 100000:
-        validation_errors.append("Maximum 100,000 price points allowed")
-    
-    # Validate num_simulations (100 to 100000)
-    num_simulations, error_msg = validate_int(
-        data.get('num_simulations', 10000), 'Number of simulations',
-        min_val=100, max_val=100000
-    )
-    if error_msg:
-        validation_errors.append(error_msg)
-    
-    # Validate seed
-    seed_val = data.get('seed', 0)
-    try:
-        seed = int(seed_val)
-        if seed < 0:
-            validation_errors.append("Seed must be a non-negative integer")
-    except (ValueError, TypeError):
-        validation_errors.append("Seed must be a valid integer")
-        seed = 0
-    
-    # Validate initial_capital
-    initial_capital, error_msg = validate_float(
-        data.get('initial_capital', 100000), 'Initial capital',
-        min_val=1000, max_val=100000000
-    )
-    if error_msg:
-        validation_errors.append(error_msg)
-    
-    # Validate numeric metrics
-    try:
-        original_return = float(data.get('original_return', 0))
-        if not (-1000 <= original_return <= 1000):
-            validation_errors.append("Original return must be between -1000% and 1000%")
-    except (ValueError, TypeError):
-        validation_errors.append("Original return must be a valid number")
-        original_return = 0
-    
-    try:
-        original_sharpe = float(data.get('original_sharpe', 0))
-        if not (-100 <= original_sharpe <= 100):
-            validation_errors.append("Original Sharpe ratio must be between -100 and 100")
-    except (ValueError, TypeError):
-        validation_errors.append("Original Sharpe ratio must be a valid number")
-        original_sharpe = 0
-    
-    try:
-        original_max_dd = float(data.get('original_max_dd', 0))
-        if not (-100 <= original_max_dd <= 0):
-            validation_errors.append("Original max drawdown must be between -100% and 0%")
-    except (ValueError, TypeError):
-        validation_errors.append("Original max drawdown must be a valid number")
-        original_max_dd = 0
-    
-    # Return validation errors if any
-    if validation_errors:
-        logger.warning(f"Monte Carlo validation failed: {validation_errors}")
-        return jsonify(create_validation_error(validation_errors)), 400
-    
-    try:
-        logger.info(f"🎲 Starting Monte Carlo analysis: {num_simulations} simulations")
-        
-        # Initialize Monte Carlo engine
-        mc_engine = MonteCarloEngine(seed=seed)
-        mc_engine.set_trades(trades)
-        
-        # Set daily returns if prices provided
-        if prices and len(prices) > 1:
-            import pandas as pd
-            price_series = pd.Series(prices)
-            mc_engine.set_daily_returns(price_series)
-        
-        # Configure simulation
-        config = SimulationConfig(
-            num_simulations=num_simulations,
-            seed=mc_engine.seed,
-            initial_capital=initial_capital
-        )
-        
-        # Run analysis
-        start_time = datetime.now()
-        analysis = mc_engine.run_analysis(config)
-        
-        # Calculate p-values and update interpretation
-        analysis = mc_engine.calculate_p_values(
-            analysis, 
-            original_return, 
-            original_sharpe
-        )
-        
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        
-        # Prepare response
-        response = analysis.to_dict()
-        response['performance'] = {
-            'elapsed_time_seconds': elapsed_time,
-            'simulations_per_second': round(num_simulations / elapsed_time, 2)
-        }
-        
-        logger.info(f"✅ Monte Carlo analysis complete in {elapsed_time:.2f}s")
-        
-        return jsonify(response), 200
-        
-    except Exception as e:
-        logger.error(f"❌ Monte Carlo analysis error: {e}")
-        logger.error(traceback.format_exc())
-        return jsonify(error=f"Monte Carlo analysis failed: {str(e)}"), 500
-
-
-@api.route('/backtest/quick_mc', methods=['POST'])
-def run_quick_monte_carlo():
-    """
-    Quick Monte Carlo analysis (1,000 simulations) for fast preview.
-    """
-    auth_response = require_auth()
-    if auth_response:
-        return auth_response
-    
-    data = request.get_json()
-    data['num_simulations'] = 1000  # Force 1k simulations
-    
-    # Forward to main endpoint
-    return run_monte_carlo()
+# Note: The Monte Carlo API endpoints (/backtest/monte_carlo and /backtest/quick_mc) 
+# have been intentionally removed. The advanced quantitative engine runs purely 
+# client-side via Pyodide WebAssembly to offload compute from the server.
 
 
 @api.route('/admin/init-redis', methods=['POST'])
