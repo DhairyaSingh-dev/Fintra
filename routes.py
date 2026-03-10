@@ -941,11 +941,11 @@ def chat():
         else:
             # Standard prompt construction
             if rag_context:
-                full_prompt = f"{system_prompt}\n\n{rag_context}\n{context_str}\n\nUser: {safe_query}\n\nUse the knowledge base information above to provide an accurate, educational response that corrects any misconceptions."
+                full_prompt = f"{system_prompt}\n\n{rag_context}\n{context_str}\n\nUser: {safe_query}"
             elif mode == 'none':
-                full_prompt = f"{system_prompt}\n\nUser: {safe_query}\n\nProvide an educational response. If the user has any misconceptions about technical analysis, politely correct them with the proper definitions."
+                full_prompt = f"{system_prompt}\n\nUser: {safe_query}"
             else:
-                full_prompt = f"{system_prompt}{context_str}\n\nUser: {safe_query}\n\nAnalyze based on the context provided. Correct any wrong frameworks or definitions."
+                full_prompt = f"{system_prompt}{context_str}\n\nUser: {safe_query}"
         
         full_prompt = full_prompt.replace('\r', ' ')
 
