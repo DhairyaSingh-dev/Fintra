@@ -1473,9 +1473,6 @@ def run_backtest():
         df, compliance_info = load_stock_data(symbol, apply_lag=True)
         if df is None:
             return jsonify(error=f"Data not found for symbol {symbol}. Please check if it's a valid Indian stock."), 404
-            
-        # Add new endpoint here instead of inside the backtest endpoint body
-        # Let's fix this in the exact same spot it matched or place it right before run_backtest.
         
         # Get available date range from the data
         available_first_date = df.index.min().strftime('%Y-%m-%d')

@@ -38,7 +38,7 @@ async function initPyodide() {
             await pyodide.loadPackage("numpy");
 
             showNotification('Loading Fintra Quant Models...', 'info');
-            const response = await fetch('/static/py_quant_engine.py');
+            const response = await fetch('/py_quant_engine.py');
             const pythonCode = await response.text();
 
             // Execute the python script to load the functions in the global pyodide scope

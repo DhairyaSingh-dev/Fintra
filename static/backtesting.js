@@ -156,7 +156,7 @@ async function initBacktestPyodide() {
             await pyodide.loadPackage("pandas");
 
             showNotification('Loading Fintra Backtest Engine...', 'info');
-            const response = await fetch('/static/py_backtest_engine.py');
+            const response = await fetch('/py_backtest_engine.py');
             const pythonCode = await response.text();
 
             // Execute the python script
