@@ -11,7 +11,7 @@ python-dotenv>=1.0.0
 requests>=2.32.0
 PyJWT>=2.8.0
 yfinance>=0.2.40
-google-generativeai>=0.5.0
+google-genai>=1.0.0
 google-auth>=2.22.0
 groq>=0.4.0
 psycopg2-binary>=2.9.9
@@ -22,9 +22,6 @@ redis>=5.0.0
 upstash-redis>=1.0.0
 flask-limiter>=3.5.0
 flask-socketio>=5.3.0
-
-# Redis Vector Library (lightweight, works on Render free tier)
-redisvl>=0.3.0
 
 # Lightweight embedding model - only ~10MB, no PyTorch needed
 # Falls back to sentence-transformers or disabled if not available

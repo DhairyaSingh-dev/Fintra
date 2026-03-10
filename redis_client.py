@@ -23,8 +23,8 @@ class RedisConfig:
     PASSWORD = os.getenv('REDIS_PASSWORD', None)
     
     # Vector search settings
-    # Gemini uses 768 embeddings, local models use 384
-    VECTOR_DIM = 768 if os.getenv('GEMINI_API_KEY') else 384
+    # Gemini embedding-001 uses 3072 dimensions, local models use 384
+    VECTOR_DIM = 3072 if os.getenv('GEMINI_API_KEY') else 384
     VECTOR_INDEX_NAME = "fintra_knowledge"
     SIMILARITY_THRESHOLD = 0.75
     

@@ -1,9 +1,15 @@
 """
 RAG (Retrieval-Augmented Generation) Engine
 Implements vector search using Redis for knowledge retrieval
+
+NOTE: Upstash REST client does NOT support RediSearch (FT.CREATE, FT.SEARCH)
+or low-level Redis commands (execute_command, scan_iter, hset with bytes).
+This engine uses a pure-Python cosine similarity approach instead, storing
+document embeddings as JSON and performing similarity search in application code.
 """
 import json
 import logging
+import math
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -15,15 +21,21 @@ logger = logging.getLogger(__name__)
 # Try lightweight embedding libraries in order of preference
 EMBEDDING_BACKEND = None
 
-# Option 0: Gemini API (Zero local memory, prioritize on free tier)
+# Option 0: Gemini API via new google.genai SDK (Zero local memory, prioritize on free tier)
 if os.getenv('GEMINI_API_KEY'):
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+        from google import genai as google_genai
         EMBEDDING_BACKEND = 'gemini'
-        logger.info("✅ Gemini API fully configured - using 0-RAM embeddings")
+        logger.info("✅ google.genai SDK available - using 0-RAM Gemini embeddings")
     except ImportError:
-        pass
+        logger.warning("google-genai package not installed, trying legacy google-generativeai")
+        try:
+            import google.generativeai as genai_legacy
+            genai_legacy.configure(api_key=os.getenv('GEMINI_API_KEY'))
+            EMBEDDING_BACKEND = 'gemini_legacy'
+            logger.info("✅ Legacy google.generativeai configured (consider upgrading to google-genai)")
+        except ImportError:
+            pass
 
 # Option 1: FastEmbed (lightweight, ~200MB, no PyTorch)
 if EMBEDDING_BACKEND is None:
@@ -54,10 +66,22 @@ except ImportError:
     NUMPY_AVAILABLE = False
     logger.error("❌ NumPy not available - RAG features disabled")
 
+
+def _cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
+    """Pure-Python cosine similarity (no numpy required)."""
+    dot = sum(a * b for a, b in zip(vec_a, vec_b))
+    norm_a = math.sqrt(sum(a * a for a in vec_a))
+    norm_b = math.sqrt(sum(b * b for b in vec_b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
 class RAGEngine:
     """
     Retrieval-Augmented Generation Engine
-    Uses Redis for vector storage and similarity search
+    Uses Redis for document storage and pure-Python cosine similarity search.
+    Compatible with Upstash REST client (no RediSearch commands needed).
     """
     
     def __init__(self):
@@ -75,6 +99,10 @@ class RAGEngine:
             
         if self.backend == 'gemini':
             self.model = 'gemini_api'
+            return
+        
+        if self.backend == 'gemini_legacy':
+            self.model = 'gemini_legacy_api'
             return
             
         if not NUMPY_AVAILABLE:
@@ -104,14 +132,21 @@ class RAGEngine:
     def embed_text(self, text: str) -> Optional[List[float]]:
         """Generate embedding vector for text"""
         self._load_model()
-        if not self.model: # Removed numpy check for Gemini
+        if not self.model:
             logger.error("Embedding model not available")
             return None
         
         try:
             if self.backend == 'gemini':
-                import google.generativeai as genai
-                result = genai.embed_content(
+                client = google_genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
+                response = client.models.embed_content(
+                    model='gemini-embedding-001',
+                    contents=text,
+                )
+                return list(response.embeddings[0].values)
+            elif self.backend == 'gemini_legacy':
+                import google.generativeai as genai_legacy
+                result = genai_legacy.embed_content(
                     model="models/embedding-001",
                     content=text,
                     task_type="retrieval_document"
@@ -132,69 +167,64 @@ class RAGEngine:
             return None
     
     def embed_query(self, query: str) -> Optional[List[float]]:
-        """Generate embedding vector for a query (Gemini requires different task_type)"""
+        """Generate embedding vector for a query"""
         self._load_model()
         if self.backend == 'gemini':
             try:
-                import google.generativeai as genai
-                result = genai.embed_content(
+                client = google_genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
+                response = client.models.embed_content(
+                    model='gemini-embedding-001',
+                    contents=query,
+                )
+                return list(response.embeddings[0].values)
+            except Exception as e:
+                logger.error(f"Error generating Gemini query embedding: {e}")
+                return None
+        elif self.backend == 'gemini_legacy':
+            try:
+                import google.generativeai as genai_legacy
+                result = genai_legacy.embed_content(
                     model="models/embedding-001",
                     content=query,
                     task_type="retrieval_query"
                 )
                 return result['embedding']
             except Exception as e:
-                logger.error(f"Error generating Gemini API query embedding: {e}")
+                logger.error(f"Error generating legacy Gemini query embedding: {e}")
                 return None
+        
+        # For other backends, query embedding == text embedding
         return self.embed_text(query)
     
     def create_index(self):
-        """Create Redis vector search index"""
+        """
+        'Create' the index — for Upstash REST, this just verifies Redis connectivity.
+        No RediSearch FT.CREATE is needed since we use pure-Python cosine similarity.
+        """
         try:
             client = redis_client.get_client()
             if not client:
                 logger.error("Redis not connected")
                 return False
             
-            # Check if index already exists
-            try:
-                client.execute_command("FT.INFO", self.index_name)
-                logger.info(f"Vector index '{self.index_name}' already exists")
-                return True
-            except:
-                pass  # Index doesn't exist, create it
-            
-            # Create vector index schema
-            schema = [
-                "FT.CREATE", self.index_name,
-                "ON", "HASH",
-                "PREFIX", "1", "doc:",
-                "SCHEMA",
-                "content", "TEXT",
-                "title", "TEXT",
-                "category", "TAG",
-                "tags", "TAG",
-                "embedding", "VECTOR", "FLAT",
-                "6",
-                "TYPE", "FLOAT32",
-                "DIM", str(self.vector_dim),
-                "DISTANCE_METRIC", "COSINE"
-            ]
-            
-            client.execute_command(*schema)
-            logger.info(f"✅ Vector index '{self.index_name}' created successfully")
+            # Verify connectivity with a simple ping
+            client.ping()
+            logger.info(f"✅ RAG index '{self.index_name}' ready (pure-Python cosine similarity mode)")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error creating vector index: {e}")
+            logger.error(f"❌ Error verifying Redis for RAG: {e}")
             return False
     
     def add_document(self, doc_id: str, content: str, title: str = "", 
                      category: str = "general", tags: List[str] = None,
                      metadata: Dict = None):
-        """Add a document to the vector index"""
-        if not NUMPY_AVAILABLE or not self.model:
-            logger.warning("Cannot add document: numpy or sentence-transformers not available")
+        """
+        Add a document to the vector index.
+        Stores embedding as a JSON list (compatible with Upstash REST).
+        """
+        if not self.backend:
+            logger.warning("Cannot add document: no embedding backend available")
             return False
             
         try:
@@ -207,24 +237,21 @@ class RAGEngine:
             if not embedding:
                 return False
             
-            # Convert embedding to bytes
-            embedding_bytes = np.array(embedding, dtype=np.float32).tobytes()
-            
-            # Prepare document data
+            # Store as JSON (Upstash REST compatible — no raw bytes)
             doc_key = f"doc:{doc_id}"
             doc_data = {
                 "content": content,
                 "title": title or doc_id,
                 "category": category,
                 "tags": ",".join(tags) if tags else "",
-                "embedding": embedding_bytes
+                "embedding": embedding,  # stored as JSON list
             }
             
             if metadata:
-                doc_data["metadata"] = json.dumps(metadata)
+                doc_data["metadata"] = metadata
             
-            # Store in Redis
-            client.hset(doc_key, mapping=doc_data)
+            # Store the whole document as a single JSON string
+            client.set(doc_key, json.dumps(doc_data))
             logger.debug(f"Document indexed: {doc_id}")
             return True
             
@@ -232,13 +259,34 @@ class RAGEngine:
             logger.error(f"Error adding document {doc_id}: {e}")
             return False
     
+    def _get_all_doc_keys(self, client) -> List[str]:
+        """Get all document keys, compatible with both standard Redis and Upstash REST."""
+        try:
+            # Try scan_iter first (standard redis-py)
+            if hasattr(client, 'scan_iter'):
+                return list(client.scan_iter(match="doc:*", count=100))
+            
+            # Fallback: use SCAN command via Upstash REST
+            keys = []
+            cursor = 0
+            while True:
+                result = client.scan(cursor, match="doc:*", count=100)
+                cursor, batch = result
+                keys.extend(batch)
+                if cursor == 0:
+                    break
+            return keys
+        except Exception as e:
+            logger.error(f"Error scanning doc keys: {e}")
+            return []
+
     def search(self, query: str, top_k: int = 3) -> List[Dict]:
         """
-        Search for similar documents
-        Returns list of documents with similarity scores
+        Search for similar documents using pure-Python cosine similarity.
+        Returns list of documents with similarity scores.
         """
-        if not NUMPY_AVAILABLE or not self.model:
-            logger.warning("Cannot search: numpy or sentence-transformers not available")
+        if not self.backend:
+            logger.warning("Cannot search: no embedding backend available")
             return []
             
         try:
@@ -252,52 +300,46 @@ class RAGEngine:
             if not query_embedding:
                 return []
             
-            # Convert to bytes
-            query_bytes = np.array(query_embedding, dtype=np.float32).tobytes()
+            # Get all document keys
+            doc_keys = self._get_all_doc_keys(client)
             
-            # Perform vector search
-            search_query = [
-                "FT.SEARCH", self.index_name,
-                "*=>[KNN {} @embedding $vec AS score]".format(top_k),
-                "PARAMS", "2", "vec", query_bytes,
-                "RETURN", "4", "content", "title", "category", "score",
-                "SORTBY", "score", "ASC",
-                "DIALECT", "2"
-            ]
+            if not doc_keys:
+                logger.debug("No documents in index")
+                return []
             
-            results = client.execute_command(*search_query)
+            # Score each document
+            scored_docs = []
+            for key in doc_keys:
+                try:
+                    raw = client.get(key)
+                    if not raw:
+                        continue
+                    
+                    doc_data = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+                    doc_embedding = doc_data.get('embedding')
+                    if not doc_embedding:
+                        continue
+                    
+                    similarity = _cosine_similarity(query_embedding, doc_embedding)
+                    
+                    if similarity >= self.similarity_threshold:
+                        scored_docs.append({
+                            'id': key.replace('doc:', '') if isinstance(key, str) else key.decode().replace('doc:', ''),
+                            'content': doc_data.get('content', ''),
+                            'title': doc_data.get('title', ''),
+                            'category': doc_data.get('category', 'general'),
+                            'similarity': similarity
+                        })
+                except Exception as e:
+                    logger.debug(f"Error processing doc {key}: {e}")
+                    continue
             
-            # Parse results
-            documents = []
-            if results and len(results) > 1:
-                # Skip the first element (total count)
-                for i in range(1, len(results), 2):
-                    if i + 1 < len(results):
-                        doc_key = results[i]
-                        fields = results[i + 1]
-                        
-                        # Convert fields list to dict
-                        field_dict = {}
-                        for j in range(0, len(fields), 2):
-                            if j + 1 < len(fields):
-                                field_dict[fields[j]] = fields[j + 1]
-                        
-                        # Calculate similarity (1 - distance for cosine)
-                        score = float(field_dict.get('score', 1.0))
-                        similarity = 1 - score
-                        
-                        # Only include if above threshold
-                        if similarity >= self.similarity_threshold:
-                            documents.append({
-                                'id': doc_key.replace('doc:', ''),
-                                'content': field_dict.get('content', ''),
-                                'title': field_dict.get('title', ''),
-                                'category': field_dict.get('category', 'general'),
-                                'similarity': similarity
-                            })
+            # Sort by similarity descending, take top_k
+            scored_docs.sort(key=lambda d: d['similarity'], reverse=True)
+            results = scored_docs[:top_k]
             
-            logger.debug(f"Search found {len(documents)} relevant documents")
-            return documents
+            logger.debug(f"Search found {len(results)} relevant documents")
+            return results
             
         except Exception as e:
             logger.error(f"Error in vector search: {e}")
@@ -326,14 +368,14 @@ class RAGEngine:
             if not client:
                 return {"error": "Redis not connected"}
             
-            # Count documents (use SCAN instead of KEYS — Upstash blocks KEYS)
-            doc_count = sum(1 for _ in client.scan_iter(match="doc:*", count=100))
+            doc_keys = self._get_all_doc_keys(client)
             
             return {
                 "index_name": self.index_name,
-                "document_count": doc_count,
+                "document_count": len(doc_keys),
                 "vector_dimension": self.vector_dim,
-                "similarity_threshold": self.similarity_threshold
+                "similarity_threshold": self.similarity_threshold,
+                "backend": self.backend or "none"
             }
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
@@ -361,10 +403,14 @@ class RAGEngine:
             if not client:
                 return False
             
-            doc_keys = list(client.scan_iter(match="doc:*", count=100))
-            if doc_keys:
-                client.delete(*doc_keys)
-                logger.info(f"Cleared {len(doc_keys)} documents from index")
+            doc_keys = self._get_all_doc_keys(client)
+            for key in doc_keys:
+                try:
+                    client.delete(key)
+                except Exception:
+                    pass
+            
+            logger.info(f"Cleared {len(doc_keys)} documents from index")
             return True
         except Exception as e:
             logger.error(f"Error clearing index: {e}")
