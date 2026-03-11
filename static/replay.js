@@ -10,6 +10,7 @@ let isPlaying = false;
 let playbackSpeed = 1.0;
 let playbackTimer = null;
 let selectedDate = null;
+let replayWindow = null;
 
 // ── Public entry point ──
 export function openReplayModal() {
@@ -26,8 +27,18 @@ export function openReplayModal() {
     }
 
     showSetup();
-    populateDateGrid();
-    populateTimeDropdowns();
+    setStatus('Loading SEBI window...');
+    loadReplayWindow().then(() => {
+        populateDateGrid();
+        populateTimeDropdowns();
+        updateDuration();
+        setStatus('');
+    }).catch(() => {
+        populateDateGrid();
+        populateTimeDropdowns();
+        updateDuration();
+        setStatus('');
+    });
     bindSetupEvents();
     bindPlayerEvents();
 }
@@ -55,10 +66,10 @@ function populateDateGrid() {
     if (!grid) return;
     grid.innerHTML = '';
 
-    const today = new Date();
+    const windowEnd = replayWindow?.end ? new Date(replayWindow.end) : new Date();
     const dates = [];
     for (let i = 31; i <= 60; i++) {
-        const d = new Date(today);
+        const d = new Date(windowEnd);
         d.setDate(d.getDate() - i);
         if (d.getDay() === 0 || d.getDay() === 6) continue;
         dates.push(d);
@@ -91,10 +102,13 @@ function populateTimeDropdowns() {
     const minStart = document.getElementById('replay-min-start');
     const minEnd = document.getElementById('replay-min-end');
 
+    const maxHour = replayWindow?.end ? new Date(replayWindow.end).getHours() : 15;
+    const maxMinute = replayWindow?.end ? new Date(replayWindow.end).getMinutes() : 59;
+
     [hourStart, hourEnd].forEach(sel => {
         if (!sel) return;
         sel.innerHTML = '';
-        for (let h = 9; h <= 15; h++) {
+        for (let h = 9; h <= Math.max(9, maxHour); h++) {
             const opt = document.createElement('option');
             opt.value = h;
             opt.textContent = h.toString().padStart(2, '0');
@@ -115,8 +129,8 @@ function populateTimeDropdowns() {
 
     if (hourStart) hourStart.value = '10';
     if (minStart) minStart.value = '0';
-    if (hourEnd) hourEnd.value = '10';
-    if (minEnd) minEnd.value = '30';
+    if (hourEnd) hourEnd.value = String(Math.min(10, maxHour));
+    if (minEnd) minEnd.value = hourEnd?.value === String(maxHour) ? String(Math.min(30, maxMinute)) : '30';
 
     [hourStart, hourEnd, minStart, minEnd].forEach(el => {
         if (el) el.addEventListener('change', updateDuration);
@@ -136,6 +150,9 @@ function updateDuration() {
     const launchBtn = document.getElementById('replay-launch-btn');
     const { hs, ms, he, me } = getSelectedTimes();
     const diff = (he * 60 + me) - (hs * 60 + ms);
+    const maxTime = replayWindow?.end ? new Date(replayWindow.end) : null;
+    const selectedDateObj = selectedDate ? new Date(`${selectedDate}T00:00:00`) : null;
+    const endSelected = selectedDate ? new Date(`${selectedDate}T${String(he).padStart(2,'0')}:${String(me).padStart(2,'0')}:00`) : null;
 
     if (diff <= 0) {
         if (badge) { badge.textContent = 'Invalid range'; badge.classList.add('invalid'); }
@@ -147,9 +164,24 @@ function updateDuration() {
         if (launchBtn) launchBtn.disabled = true;
         return;
     }
+    if (maxTime && endSelected && selectedDateObj && selectedDateObj.toDateString() === maxTime.toDateString() && endSelected > maxTime) {
+        if (badge) { badge.textContent = 'End exceeds SEBI window'; badge.classList.add('invalid'); }
+        if (launchBtn) launchBtn.disabled = true;
+        return;
+    }
 
     if (badge) { badge.textContent = `${diff} min · ${diff} candles`; badge.classList.remove('invalid'); }
     if (launchBtn) launchBtn.disabled = !selectedDate;
+}
+
+async function loadReplayWindow() {
+    const url = `${CONFIG.API_BASE_URL}/replay/window`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.window_start && data?.window_end) {
+        replayWindow = { start: data.window_start, end: data.window_end };
+    }
 }
 
 // ── Setup Events ──

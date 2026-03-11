@@ -17,9 +17,8 @@ def _is_valid_window(start_dt: datetime.datetime, end_dt: datetime.datetime) -> 
     return (end_dt - start_dt).total_seconds() <= 60 * 60 and end_dt > start_dt
 
 def _enforce_sebi_lag(end_dt: datetime.datetime) -> bool:
-    # End must be at least 30 days before now
-    lag = datetime.datetime.utcnow() - datetime.timedelta(days=30)
-    return end_dt <= lag
+    _, window_end = get_intraday_window()
+    return end_dt <= window_end
 
 
 def _load_intraday_parquet(symbol: str, start_dt: datetime.datetime, end_dt: datetime.datetime) -> pd.DataFrame:

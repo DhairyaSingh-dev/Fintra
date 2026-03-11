@@ -19,15 +19,19 @@ INTRADAY_DIRECTORY = os.path.join(os.path.dirname(__file__), 'intraday_data')
 
 
 def get_intraday_window(today: Optional[datetime] = None) -> Tuple[datetime, datetime]:
-    base_date = datetime.utcnow().date()
+    now = datetime.utcnow()
+    base_date = now.date()
+    end_time = now.time().replace(microsecond=0)
     if isinstance(today, datetime):
         base_date = today.date()
+        end_time = today.time().replace(microsecond=0)
     elif today is not None:
         base_date = today
+        end_time = time(23, 59, 59)
     start_date = base_date - timedelta(days=60)
     end_date = base_date - timedelta(days=31)
     start_dt = datetime.combine(start_date, time(0, 0, 0))
-    end_dt = datetime.combine(end_date, time(23, 59, 59))
+    end_dt = datetime.combine(end_date, end_time)
     return start_dt, end_dt
 
 

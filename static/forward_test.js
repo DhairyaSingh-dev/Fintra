@@ -7,6 +7,7 @@ let ftCandles = [];
 let ftIndex = 0;
 let ftTotalCandles = 0;
 let ftSelectedDate = null;
+let ftReplayWindow = null;
 
 // Trading state
 let ftCash = 100000;
@@ -31,8 +32,18 @@ export function openForwardTestModal() {
     }
 
     showFTSetup();
-    populateFTDateGrid();
-    populateFTTimeDropdowns();
+    setFTStatus('Loading SEBI window...');
+    loadFTReplayWindow().then(() => {
+        populateFTDateGrid();
+        populateFTTimeDropdowns();
+        updateFTDuration();
+        setFTStatus('');
+    }).catch(() => {
+        populateFTDateGrid();
+        populateFTTimeDropdowns();
+        updateFTDuration();
+        setFTStatus('');
+    });
     bindFTSetupEvents();
     bindFTTradingEvents();
 }
@@ -65,10 +76,10 @@ function el(id) { return document.getElementById(id) || document.createElement('
 function populateFTDateGrid() {
     const grid = el('ft-date-grid');
     grid.innerHTML = '';
-    const today = new Date();
+    const windowEnd = ftReplayWindow?.end ? new Date(ftReplayWindow.end) : new Date();
     const dates = [];
     for (let i = 31; i <= 60; i++) {
-        const d = new Date(today);
+        const d = new Date(windowEnd);
         d.setDate(d.getDate() - i);
         if (d.getDay() === 0 || d.getDay() === 6) continue;
         dates.push(d);
@@ -95,10 +106,13 @@ function populateFTDateGrid() {
 }
 
 function populateFTTimeDropdowns() {
+    const maxHour = ftReplayWindow?.end ? new Date(ftReplayWindow.end).getHours() : 15;
+    const maxMinute = ftReplayWindow?.end ? new Date(ftReplayWindow.end).getMinutes() : 59;
+
     ['ft-hour-start', 'ft-hour-end'].forEach(id => {
         const sel = el(id);
         sel.innerHTML = '';
-        for (let h = 9; h <= 15; h++) {
+        for (let h = 9; h <= Math.max(9, maxHour); h++) {
             const opt = document.createElement('option');
             opt.value = h; opt.textContent = String(h).padStart(2, '0');
             sel.appendChild(opt);
@@ -114,9 +128,10 @@ function populateFTTimeDropdowns() {
         }
     });
     el('ft-hour-start').value = '10';
+    el('ft-hour-start').value = '10';
     el('ft-min-start').value = '0';
-    el('ft-hour-end').value = '10';
-    el('ft-min-end').value = '30';
+    el('ft-hour-end').value = String(Math.min(10, maxHour));
+    el('ft-min-end').value = el('ft-hour-end').value === String(maxHour) ? String(Math.min(30, maxMinute)) : '30';
 
     ['ft-hour-start', 'ft-hour-end', 'ft-min-start', 'ft-min-end'].forEach(id => {
         el(id).addEventListener('change', updateFTDuration);
@@ -137,6 +152,9 @@ function updateFTDuration() {
     const btn = el('ft-launch-btn');
     const { hs, ms, he, me } = getFTTimes();
     const diff = (he * 60 + me) - (hs * 60 + ms);
+    const maxTime = ftReplayWindow?.end ? new Date(ftReplayWindow.end) : null;
+    const selectedDateObj = ftSelectedDate ? new Date(`${ftSelectedDate}T00:00:00`) : null;
+    const endSelected = ftSelectedDate ? new Date(`${ftSelectedDate}T${String(he).padStart(2,'0')}:${String(me).padStart(2,'0')}:00`) : null;
 
     if (diff <= 0 || diff > 60) {
         badge.textContent = diff <= 0 ? 'Invalid range' : `${diff} min (max 60)`;
@@ -144,9 +162,25 @@ function updateFTDuration() {
         btn.disabled = true;
         return;
     }
+    if (maxTime && endSelected && selectedDateObj && selectedDateObj.toDateString() === maxTime.toDateString() && endSelected > maxTime) {
+        badge.textContent = 'End exceeds SEBI window';
+        badge.classList.add('invalid');
+        btn.disabled = true;
+        return;
+    }
     badge.textContent = `${diff} min · ${diff} candles`;
     badge.classList.remove('invalid');
     btn.disabled = !ftSelectedDate;
+}
+
+async function loadFTReplayWindow() {
+    const url = `${CONFIG.API_BASE_URL}/replay/window`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.window_start && data?.window_end) {
+        ftReplayWindow = { start: data.window_start, end: data.window_end };
+    }
 }
 
 // ── Setup Events ──
