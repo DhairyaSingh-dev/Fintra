@@ -188,10 +188,14 @@ async function fetchAIAnalysis(backtestConfig, results) {
 
 function updateAIAnalysisSection(markdownText) {
     const aiContainer = document.querySelector('.backtest-ai-summary .ai-content');
-    if (aiContainer && typeof marked !== 'undefined') {
-        aiContainer.innerHTML = marked.parse(markdownText);
-    } else if (aiContainer) {
-        aiContainer.textContent = markdownText;
+    if (aiContainer) {
+        // Remove the loading state
+        aiContainer.classList.remove('ai-loading');
+        if (typeof marked !== 'undefined') {
+            aiContainer.innerHTML = marked.parse(markdownText);
+        } else {
+            aiContainer.textContent = markdownText;
+        }
     }
 }
 
@@ -256,6 +260,7 @@ async function handleBacktestSubmit(e) {
     showLoading();
     hideError();
     hideResults();
+    resetPreviousResults();
 
     try {
         // Fetch raw stock history data
@@ -296,8 +301,8 @@ async function handleBacktestSubmit(e) {
             throw new Error(results.message || "Failed to run backtest in WASM.");
         }
 
-        // Show initial results immediately (AI analysis will load async)
-        results.ai_analysis = "⏳ Generating AI analysis... This may take a moment.";
+        // Show initial results immediately with a spinner (AI analysis loads async)
+        results.ai_analysis = '__AI_SPINNER__';
 
         // Store results for Monte Carlo
         window.currentBacktestData = {
@@ -394,43 +399,66 @@ function displayBacktestResults(results, params) {
     const losingTrades = trades.filter(t => t.result === 'Loss').length;
     const winRate = trades.length > 0 ? (winningTrades / trades.length * 100).toFixed(1) : 0;
 
+    // Read stat visibility from checkboxes (default all visible in beginner mode)
+    const isAdvanced = currentMode === 'advanced';
+    const statVisible = {
+        finalValue:  !isAdvanced || (document.getElementById('stat-final-value')?.checked !== false),
+        buyHold:     !isAdvanced || (document.getElementById('stat-buy-hold')?.checked !== false),
+        roi:         !isAdvanced || (document.getElementById('stat-roi')?.checked !== false),
+        sharpe:      !isAdvanced || (document.getElementById('stat-sharpe')?.checked !== false),
+        maxDrawdown: !isAdvanced || (document.getElementById('stat-max-dd')?.checked !== false),
+        winRate:     !isAdvanced || (document.getElementById('stat-win-rate')?.checked !== false),
+        tradeCount:  !isAdvanced || (document.getElementById('stat-trade-count')?.checked !== false),
+        aiAnalysis:  !isAdvanced || (document.getElementById('stat-ai-analysis')?.checked !== false),
+    };
+
+    // Build AI summary
     let aiSummary = '';
-    if (results.ai_analysis) {
-        const aiHtml = marked.parse(results.ai_analysis);
-        aiSummary = `
-            <div class="backtest-ai-summary">
-                <h3>🤖 AI Strategy Analysis</h3>
-                <div class="ai-content">${aiHtml}</div>
-            </div>
-        `;
+    if (results.ai_analysis && statVisible.aiAnalysis) {
+        if (results.ai_analysis === '__AI_SPINNER__') {
+            aiSummary = `
+                <div class="backtest-ai-summary">
+                    <h3>🤖 AI Strategy Analysis</h3>
+                    <div class="ai-content ai-loading">
+                        <div class="ai-spinner"></div>
+                        <div class="ai-loading-text">Generating institutional-grade analysis via Groq...</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            const aiHtml = marked.parse(results.ai_analysis);
+            aiSummary = `
+                <div class="backtest-ai-summary">
+                    <h3>🤖 AI Strategy Analysis</h3>
+                    <div class="ai-content">${aiHtml}</div>
+                </div>
+            `;
+        }
     }
 
+    // Build trades section
     let tradesSection = '';
     if (trades.length > 0) {
+        // Build the summary stat pills conditionally
+        let summaryStats = '';
+        if (statVisible.tradeCount) {
+            summaryStats += `<div class="trade-stat"><span>Total Trades</span><strong>${trades.length}</strong></div>`;
+        }
+        if (statVisible.winRate) {
+            summaryStats += `
+                <div class="trade-stat"><span>Winning</span><strong class="positive">${winningTrades}</strong></div>
+                <div class="trade-stat"><span>Losing</span><strong class="negative">${losingTrades}</strong></div>
+                <div class="trade-stat"><span>Win Rate</span><strong>${winRate}%</strong></div>
+            `;
+        }
+
         tradesSection = `
             <div class="trades-section">
                 <h3 class="trades-toggle" onclick="this.nextElementSibling.classList.toggle('expanded'); this.classList.toggle('expanded')">
                     📋 Trade History <span class="toggle-icon">▼</span>
                 </h3>
                 <div class="trades-content collapsed">
-                <div class="trades-summary">
-                    <div class="trade-stat">
-                        <span>Total Trades</span>
-                        <strong>${trades.length}</strong>
-                    </div>
-                    <div class="trade-stat">
-                        <span>Winning</span>
-                        <strong class="positive">${winningTrades}</strong>
-                    </div>
-                    <div class="trade-stat">
-                        <span>Losing</span>
-                        <strong class="negative">${losingTrades}</strong>
-                    </div>
-                    <div class="trade-stat">
-                        <span>Win Rate</span>
-                        <strong>${winRate}%</strong>
-                    </div>
-                </div>
+                ${summaryStats ? `<div class="trades-summary">${summaryStats}</div>` : ''}
                 <div class="trades-table-wrapper">
                     <table class="trades-table">
                         <thead>
@@ -466,6 +494,69 @@ function displayBacktestResults(results, params) {
         `;
     }
 
+    // Build metric cards conditionally
+    let metricCards = '';
+
+    if (statVisible.finalValue) {
+        metricCards += `
+            <div class="metric-card primary">
+                <div class="metric-label">Strategy Final Value</div>
+                <div class="metric-value">₹${results.final_portfolio_value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
+                ${statVisible.roi ? `<div class="metric-change ${roiClass}">${roiSign}${results.strategy_return_pct.toFixed(2)}% ROI</div>` : ''}
+            </div>
+        `;
+    }
+
+    if (statVisible.buyHold) {
+        metricCards += `
+            <div class="metric-card secondary">
+                <div class="metric-label">Buy & Hold Value</div>
+                <div class="metric-value">₹${results.market_buy_hold_value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
+                ${statVisible.roi ? `<div class="metric-change ${marketRoiClass}">${marketRoiSign}${results.market_return_pct.toFixed(2)}% ROI</div>` : ''}
+            </div>
+        `;
+    }
+
+    if (statVisible.sharpe) {
+        metricCards += `
+            <div class="metric-card">
+                <div class="metric-label">Sharpe Ratio</div>
+                <div class="metric-value">${results.sharpe_ratio.toFixed(2)}</div>
+                <div class="metric-sub">Risk-adjusted return</div>
+            </div>
+        `;
+    }
+
+    if (statVisible.maxDrawdown) {
+        metricCards += `
+            <div class="metric-card">
+                <div class="metric-label">Max Drawdown</div>
+                <div class="metric-value negative">${results.max_drawdown_pct.toFixed(2)}%</div>
+                <div class="metric-sub">Worst drop from peak</div>
+            </div>
+        `;
+    }
+
+    if (statVisible.winRate && trades.length > 0) {
+        metricCards += `
+            <div class="metric-card">
+                <div class="metric-label">Win Rate</div>
+                <div class="metric-value">${winRate}%</div>
+                <div class="metric-sub">${winningTrades}W / ${losingTrades}L</div>
+            </div>
+        `;
+    }
+
+    if (statVisible.tradeCount && trades.length > 0) {
+        metricCards += `
+            <div class="metric-card">
+                <div class="metric-label">Total Trades</div>
+                <div class="metric-value">${trades.length}</div>
+                <div class="metric-sub">Executed positions</div>
+            </div>
+        `;
+    }
+
     container.innerHTML = `
         <div class="backtest-results-container">
             <div class="backtest-summary">
@@ -476,33 +567,7 @@ function displayBacktestResults(results, params) {
                 </p>
                 
                 <div class="metrics-grid">
-                    <div class="metric-card primary">
-                        <div class="metric-label">Strategy Final Value</div>
-                        <div class="metric-value">₹${results.final_portfolio_value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
-                        <div class="metric-change ${roiClass}">
-                            ${roiSign}${results.strategy_return_pct.toFixed(2)}% ROI
-                        </div>
-                    </div>
-                    
-                    <div class="metric-card secondary">
-                        <div class="metric-label">Buy & Hold Value</div>
-                        <div class="metric-value">₹${results.market_buy_hold_value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
-                        <div class="metric-change ${marketRoiClass}">
-                            ${marketRoiSign}${results.market_return_pct.toFixed(2)}% ROI
-                        </div>
-                    </div>
-                    
-                    <div class="metric-card">
-                        <div class="metric-label">Sharpe Ratio</div>
-                        <div class="metric-value">${results.sharpe_ratio.toFixed(2)}</div>
-                        <div class="metric-sub">Risk-adjusted return</div>
-                    </div>
-                    
-                    <div class="metric-card">
-                        <div class="metric-label">Max Drawdown</div>
-                        <div class="metric-value negative">${results.max_drawdown_pct.toFixed(2)}%</div>
-                        <div class="metric-sub">Worst drop from peak</div>
-                    </div>
+                    ${metricCards}
                 </div>
             </div>
             
@@ -572,6 +637,31 @@ function hideError() {
 function hideResults() {
     if (DOM.backtestingResults) {
         DOM.backtestingResults.style.display = 'none';
+    }
+}
+
+function resetPreviousResults() {
+    // Clear stored backtest data
+    window.currentBacktestData = null;
+
+    // Hide and clear Monte Carlo section
+    const mcSection = document.getElementById('monte-carlo-section');
+    if (mcSection) {
+        mcSection.classList.add('hidden');
+    }
+    const mcResults = document.getElementById('mc-results');
+    if (mcResults) {
+        mcResults.innerHTML = '';
+    }
+    const mcError = document.getElementById('mc-error');
+    if (mcError) {
+        mcError.textContent = '';
+    }
+
+    // Hide post-backtest options
+    const optionsDiv = document.getElementById('post-backtest-options');
+    if (optionsDiv) {
+        optionsDiv.classList.add('hidden');
     }
 }
 

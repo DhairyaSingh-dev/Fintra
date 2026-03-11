@@ -106,7 +106,7 @@
                         <h3>Strategy Configuration</h3>
                         <div class="mode-toggle">
                             <button type="button" id="beginner-mode-btn" class="mode-btn active">Beginner</button>
-                            <button type="button" id="advanced-mode-btn" class="mode-btn">Advanced</button>
+                            <button type="button" id="advanced-mode-btn" class="mode-btn" title="Unlock advanced parameters and customize which backtest statistics are displayed in your results">Advanced</button>
                         </div>
                         
                         <div class="strategy-selector">
@@ -130,6 +130,23 @@
                             <div class="param-group">
                                 <label for="risk-per-trade">Risk Per Trade (%):</label>
                                 <input type="number" id="risk-per-trade" name="risk_per_trade" value="2.0" step="0.1" min="0.1" max="10.0">
+                            </div>
+
+                            <div class="stat-selector">
+                                <h4 class="stat-selector-title">
+                                    📊 Visible Result Metrics
+                                    <span class="stat-selector-hint">Select which statistics appear in your backtest results</span>
+                                </h4>
+                                <div class="stat-checkboxes">
+                                    <label class="stat-checkbox"><input type="checkbox" id="stat-final-value" checked> Strategy Final Value</label>
+                                    <label class="stat-checkbox"><input type="checkbox" id="stat-buy-hold" checked> Buy &amp; Hold Value</label>
+                                    <label class="stat-checkbox"><input type="checkbox" id="stat-roi" checked> Return on Investment</label>
+                                    <label class="stat-checkbox"><input type="checkbox" id="stat-sharpe" checked> Sharpe Ratio</label>
+                                    <label class="stat-checkbox"><input type="checkbox" id="stat-max-dd" checked> Max Drawdown</label>
+                                    <label class="stat-checkbox"><input type="checkbox" id="stat-win-rate" checked> Win Rate</label>
+                                    <label class="stat-checkbox"><input type="checkbox" id="stat-trade-count" checked> Trade Count</label>
+                                    <label class="stat-checkbox"><input type="checkbox" id="stat-ai-analysis" checked> AI Analysis</label>
+                                </div>
                             </div>
                         </div>
                     </div>
