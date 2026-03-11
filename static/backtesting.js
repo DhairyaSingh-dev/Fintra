@@ -322,8 +322,18 @@ async function handleBacktestSubmit(e) {
         const results = JSON.parse(resultJsonString);
         pyConfig.destroy(); // Free memory
 
-        if (results.error === true) {
-            throw new Error(results.message || "Failed to run backtest in WASM.");
+        // Catch ALL error shapes: {error: true, message: "..."} or {error: "some string"}
+        if (results.error) {
+            const errMsg = typeof results.error === 'string' ? results.error : results.message;
+            throw new Error(errMsg || "Failed to run backtest in WASM.");
+        }
+
+        // Validate that essential result keys actually exist before rendering
+        const requiredKeys = ['final_portfolio_value', 'market_buy_hold_value', 'strategy_return_pct', 'market_return_pct', 'sharpe_ratio', 'max_drawdown_pct'];
+        const missingKeys = requiredKeys.filter(k => results[k] === undefined || results[k] === null);
+        if (missingKeys.length > 0) {
+            console.error('Missing result keys:', missingKeys, 'Full results:', results);
+            throw new Error(`Backtest produced incomplete results (missing: ${missingKeys.join(', ')}). Please try a different date range or symbol.`);
         }
 
         // Show initial results immediately with a spinner (AI analysis loads async)
@@ -333,11 +343,11 @@ async function handleBacktestSubmit(e) {
         window.currentBacktestData = {
             ...backtestConfig,
             trades: results.trades || [],
-            prices: dataJson.data || [], // Supply prices to Monte Carlo if needed
-            strategy_return_pct: results.strategy_return_pct || 0,
-            sharpe_ratio: results.sharpe_ratio || 0,
-            max_drawdown_pct: results.max_drawdown_pct || 0,
-            final_portfolio_value: results.final_portfolio_value || 0
+            prices: dataJson.data || [],
+            strategy_return_pct: results.strategy_return_pct ?? 0,
+            sharpe_ratio: results.sharpe_ratio ?? 0,
+            max_drawdown_pct: results.max_drawdown_pct ?? 0,
+            final_portfolio_value: results.final_portfolio_value ?? 0
         };
 
         displayBacktestResults(results, backtestConfig);
@@ -414,10 +424,12 @@ function displayBacktestResults(results, params) {
 
     container.style.display = 'block';
 
-    const roiClass = results.strategy_return_pct >= 0 ? 'positive' : 'negative';
-    const marketRoiClass = results.market_return_pct >= 0 ? 'positive' : 'negative';
-    const roiSign = results.strategy_return_pct >= 0 ? '+' : '';
-    const marketRoiSign = results.market_return_pct >= 0 ? '+' : '';
+    const strategyReturnPct = results.strategy_return_pct ?? 0;
+    const marketReturnPct = results.market_return_pct ?? 0;
+    const roiClass = strategyReturnPct >= 0 ? 'positive' : 'negative';
+    const marketRoiClass = marketReturnPct >= 0 ? 'positive' : 'negative';
+    const roiSign = strategyReturnPct >= 0 ? '+' : '';
+    const marketRoiSign = marketReturnPct >= 0 ? '+' : '';
 
     const trades = results.trades || [];
     const winningTrades = trades.filter(t => t.result === 'Win').length;
@@ -523,40 +535,44 @@ function displayBacktestResults(results, params) {
     let metricCards = '';
 
     if (statVisible.finalValue) {
+        const finalVal = results.final_portfolio_value ?? 0;
         metricCards += `
             <div class="metric-card primary">
                 <div class="metric-label">Strategy Final Value</div>
-                <div class="metric-value">₹${results.final_portfolio_value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
-                ${statVisible.roi ? `<div class="metric-change ${roiClass}">${roiSign}${results.strategy_return_pct.toFixed(2)}% ROI</div>` : ''}
+                <div class="metric-value">₹${Number(finalVal).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
+                ${statVisible.roi ? `<div class="metric-change ${roiClass}">${roiSign}${strategyReturnPct.toFixed(2)}% ROI</div>` : ''}
             </div>
         `;
     }
 
     if (statVisible.buyHold) {
+        const buyHoldVal = results.market_buy_hold_value ?? 0;
         metricCards += `
             <div class="metric-card secondary">
                 <div class="metric-label">Buy & Hold Value</div>
-                <div class="metric-value">₹${results.market_buy_hold_value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
-                ${statVisible.roi ? `<div class="metric-change ${marketRoiClass}">${marketRoiSign}${results.market_return_pct.toFixed(2)}% ROI</div>` : ''}
+                <div class="metric-value">₹${Number(buyHoldVal).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
+                ${statVisible.roi ? `<div class="metric-change ${marketRoiClass}">${marketRoiSign}${marketReturnPct.toFixed(2)}% ROI</div>` : ''}
             </div>
         `;
     }
 
     if (statVisible.sharpe) {
+        const sharpeVal = results.sharpe_ratio ?? 0;
         metricCards += `
             <div class="metric-card">
                 <div class="metric-label">Sharpe Ratio</div>
-                <div class="metric-value">${results.sharpe_ratio.toFixed(2)}</div>
+                <div class="metric-value">${Number(sharpeVal).toFixed(2)}</div>
                 <div class="metric-sub">Risk-adjusted return</div>
             </div>
         `;
     }
 
     if (statVisible.maxDrawdown) {
+        const maxDdVal = results.max_drawdown_pct ?? 0;
         metricCards += `
             <div class="metric-card">
                 <div class="metric-label">Max Drawdown</div>
-                <div class="metric-value negative">${results.max_drawdown_pct.toFixed(2)}%</div>
+                <div class="metric-value negative">${Number(maxDdVal).toFixed(2)}%</div>
                 <div class="metric-sub">Worst drop from peak</div>
             </div>
         `;

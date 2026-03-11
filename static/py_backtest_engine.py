@@ -374,6 +374,25 @@ class BacktestEngine:
         }
 
 import json
+import math
+
+def _sanitize_value(v):
+    """Replace NaN/Inf floats with 0 so json.dumps produces valid JSON."""
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        return 0.0
+    return v
+
+def _sanitize_dict(d):
+    """Recursively sanitize a dict, replacing NaN/Inf with 0."""
+    cleaned = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            cleaned[k] = _sanitize_dict(v)
+        elif isinstance(v, list):
+            cleaned[k] = [_sanitize_dict(item) if isinstance(item, dict) else _sanitize_value(item) for item in v]
+        else:
+            cleaned[k] = _sanitize_value(v)
+    return cleaned
 
 def run_backtest_browser(data_json, config):
     try:
@@ -392,14 +411,17 @@ def run_backtest_browser(data_json, config):
             start_date=config.get('start_date'),
             end_date=config.get('end_date'),
             atr_multiplier=float(config.get('atr_multiplier', 3.0)),
-            risk_per_trade=float(config.get('risk_per_trade', 2.0)) / 100.0,
+            risk_per_trade=float(config.get('risk_per_trade', 0.02)),
             tax_rate=0.002
         )
         
         # We drop the dataframe for JSON serialization
         if 'trades_df' in perf:
             del perf['trades_df']
+        
+        # Sanitize NaN/Inf values to prevent invalid JSON
+        perf = _sanitize_dict(perf)
             
         return json.dumps(perf)
     except Exception as e:
-        return json.dumps({'error': str(e)})
+        return json.dumps({'error': True, 'message': str(e)})
