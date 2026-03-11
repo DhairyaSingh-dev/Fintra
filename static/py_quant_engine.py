@@ -40,7 +40,7 @@ def run_advanced_simulation(config_dict):
         # Set seed if provided
         seed = int(config_dict.get('seed', 0))
         if seed == 0:
-            seed = np.random.randint(1, 4294967295)
+            seed = int(np.random.default_rng().integers(1, 2147483647))
         rng = np.random.default_rng(seed)
         
         # 2. Prepare arrays for paths

@@ -144,6 +144,57 @@ function setDefaultDateRange() {
     if (DOM.endDate) DOM.endDate.value = '';
 }
 
+async function fetchAIAnalysis(backtestConfig, results) {
+    try {
+        const payload = {
+            symbol: backtestConfig.symbol,
+            strategy: backtestConfig.strategy,
+            start_date: backtestConfig.start_date,
+            end_date: backtestConfig.end_date,
+            initial_balance: backtestConfig.initial_balance,
+            final_portfolio_value: results.final_portfolio_value,
+            strategy_return_pct: results.strategy_return_pct,
+            market_return_pct: results.market_return_pct,
+            sharpe_ratio: results.sharpe_ratio,
+            max_drawdown_pct: results.max_drawdown_pct,
+            trades: results.trades || []
+        };
+
+        const response = await fetch(`${CONFIG.API_BASE_URL}/backtest/ai-analysis`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            console.warn('AI analysis request failed:', response.status);
+            updateAIAnalysisSection("AI analysis unavailable. Server returned an error.");
+            return;
+        }
+
+        const data = await response.json();
+        const aiText = data.ai_analysis || "No AI analysis returned.";
+        updateAIAnalysisSection(aiText);
+
+    } catch (error) {
+        console.error('AI analysis fetch error:', error);
+        updateAIAnalysisSection("AI analysis temporarily unavailable. Please try again later.");
+    }
+}
+
+function updateAIAnalysisSection(markdownText) {
+    const aiContainer = document.querySelector('.backtest-ai-summary .ai-content');
+    if (aiContainer && typeof marked !== 'undefined') {
+        aiContainer.innerHTML = marked.parse(markdownText);
+    } else if (aiContainer) {
+        aiContainer.textContent = markdownText;
+    }
+}
+
 let pyodideBacktestPromise = null;
 
 async function initBacktestPyodide() {
@@ -245,8 +296,8 @@ async function handleBacktestSubmit(e) {
             throw new Error(results.message || "Failed to run backtest in WASM.");
         }
 
-        // Optional JS-based fallback AI analysis logic could be added here
-        results.ai_analysis = "AI Analysis is disabled in client-side WebAssembly execution. Historical data has been parsed and computed locally on your device.";
+        // Show initial results immediately (AI analysis will load async)
+        results.ai_analysis = "⏳ Generating AI analysis... This may take a moment.";
 
         // Store results for Monte Carlo
         window.currentBacktestData = {
@@ -261,6 +312,9 @@ async function handleBacktestSubmit(e) {
 
         displayBacktestResults(results, backtestConfig);
         showNotification('Client-Side Backtest completed successfully!', 'success');
+
+        // Fire async AI analysis request (non-blocking)
+        fetchAIAnalysis(backtestConfig, results);
 
         // Show Monte Carlo section
         const mcSection = document.getElementById('monte-carlo-section');

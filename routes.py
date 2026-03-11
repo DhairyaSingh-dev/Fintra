@@ -1594,6 +1594,111 @@ quantitative decomposition of HISTORICAL backtest data. This is pure historical 
 # client-side via Pyodide WebAssembly to offload compute from the server.
 
 
+@api.route('/backtest/ai-analysis', methods=['POST'])
+def backtest_ai_analysis():
+    """
+    Generate AI analysis for client-side computed backtest results.
+    The heavy backtest computation is done in Pyodide, but AI analysis
+    still needs the server-side Groq API.
+    """
+    auth_response = require_auth()
+    if auth_response: return auth_response
+
+    data = request.get_json()
+    if not data:
+        return jsonify(error="No data provided"), 400
+
+    # Extract fields from the client-computed results
+    symbol = data.get('symbol', 'UNKNOWN')
+    strategy = data.get('strategy', 'composite')
+    start_date = data.get('start_date', 'N/A')
+    end_date = data.get('end_date', 'N/A')
+    initial_balance = float(data.get('initial_balance', 100000))
+    final_portfolio_value = float(data.get('final_portfolio_value', 0))
+    strategy_return_pct = float(data.get('strategy_return_pct', 0))
+    market_return_pct = float(data.get('market_return_pct', 0))
+    sharpe_ratio_val = float(data.get('sharpe_ratio', 0))
+    max_drawdown_pct = float(data.get('max_drawdown_pct', 0))
+    trades = data.get('trades', [])
+
+    if not trades:
+        return jsonify(ai_analysis="Insufficient trade data for AI analysis. The strategy produced no trades in this period."), 200
+
+    # Build trade details string
+    trades_df = pd.DataFrame(trades)
+    if 'result' not in trades_df.columns:
+        trades_df['result'] = trades_df['pnl_pct'].apply(lambda x: 'Win' if x > 0 else 'Loss')
+
+    win_count = len(trades_df[trades_df['result'] == 'Win'])
+    win_rate = (win_count / len(trades_df) * 100) if len(trades_df) > 0 else 0
+
+    trade_cols = ['entry_date', 'exit_date', 'entry_price', 'exit_price', 'pnl_pct', 'result', 'reason']
+    available_cols = [c for c in trade_cols if c in trades_df.columns]
+    trade_details = trades_df[available_cols].to_string(index=False) if available_cols else "No detailed trade data"
+
+    performance_summary = f"""
+    Backtest Results Summary for {symbol}:
+    - Strategy: {strategy}
+    - Period: {start_date} to {end_date}
+    - Initial Capital: ₹{initial_balance:,.2f}
+    - Final Value: ₹{final_portfolio_value:,.2f}
+    - Total Return: {strategy_return_pct:.2f}%
+    - Buy & Hold Return: {market_return_pct:.2f}%
+    - Sharpe Ratio: {sharpe_ratio_val:.2f}
+    - Max Drawdown: {max_drawdown_pct:.2f}%
+    - Total Trades: {len(trades_df)}
+    - Win Rate: {win_rate:.1f}%
+
+    Trade Details:
+    {trade_details}
+    """
+
+    ai_prompt = f"""
+You are the **Fintra Historical Strategy Analysis Engine**. Your role is to provide a neutral, 
+quantitative decomposition of HISTORICAL backtest data. This is pure historical analysis, not current market assessment.
+
+**⚠️ CRITICAL CONTEXT: HISTORICAL BACKTEST ONLY ⚠️**
+- This is a backtest of historical data from {start_date} to {end_date}
+- Data includes a mandatory 31-day SEBI compliance lag
+- This analysis examines what happened in the past, not what to do now
+- All performance metrics are hypothetical historical simulations
+
+### HISTORICAL INPUT DATA FOR {symbol} (Period: {start_date} to {end_date}):
+{performance_summary}
+
+### OBJECTIVES - HISTORICAL ANALYSIS ONLY:
+1. **📊 Historical Statistical Performance:** Compare the Strategy Final Value against the Buy & Hold benchmark during the historical period {start_date} to {end_date}. State the historical delta objectively using past tense.
+2. **📉 Historical Risk Attribution:** Describe the historical relationship between the Max Drawdown and Sharpe Ratio.
+3. **🔍 Historical Variable Sensitivity:** Identify which historical parameters (like Exit Reasons or Stop Loss frequency) most heavily influenced the total historical P&L during this period. 
+4. **📅 Historical Market Regime Context:** Note how the strategy performed during specific historical market conditions found in the data.
+5. **🧩 Historical Edge Case Analysis:** Identify the single largest historical win and loss; describe the technical conditions.
+
+### MANDATORY CONSTRAINTS:
+- **⏰ TIME CONTEXT:** ALWAYS reference the historical period ({start_date} to {end_date}) and use past tense
+- **📖 HISTORICAL FRAMING:** Use "During the backtest period...", "In this historical simulation..."
+- **🚫 NO CURRENT REFERENCES:** Never imply this is current or applicable to today's market
+- **🚫 NO PRESCRIPTIONS:** Do not suggest "improvements," "next steps," or "adjustments."
+- **📊 OBJECTIVE TONE:** Avoid evaluative words like "Concerning," "Good," "Bad," "Successful," or "Failed."
+- **🚫 NO DIRECTIVES:** Never use "Buy," "Sell," "Hold," "Trade," or "Traders should."
+- **DISCLAIMER:** Conclude with the Mandatory Disclaimer below.
+
+### FORMATTING:
+- Use ## for Headers.
+- Use **Bold** for all numerical values.
+- Use Code Blocks for any data comparisons.
+- Include date range ({start_date} to {end_date}) in section headers.
+
+## MANDATORY DISCLAIMER
+⚠️ **HISTORICAL BACKTEST ALERT:** This analysis is based on historical data from {start_date} to {end_date} with a mandatory 30+ day lag per SEBI regulations. This is a hypothetical historical simulation, NOT a current market assessment, NOT financial advice, and NOT a recommendation to trade. Past results do not predict future returns. All trading involves substantial risk.
+"""
+
+    try:
+        ai_analysis = call_groq_api(ai_prompt, task_type='heavy_data')
+        return jsonify(ai_analysis=ai_analysis), 200
+    except Exception as e:
+        logger.error(f"AI analysis failed: {e}")
+        return jsonify(ai_analysis="AI analysis temporarily unavailable. Please try again later."), 200
+
 @api.route('/admin/init-redis', methods=['POST'])
 def admin_init_redis():
     """
