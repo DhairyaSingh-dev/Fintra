@@ -12,6 +12,7 @@ import { initializeMonteCarlo } from './monte_carlo.js';
 import { initializeDataInformatics } from './data_informatics.js';
 import { initializeDataTransparency } from './data_transparency.js';
 import './replay.js';
+import './forward_test.js';
 
 async function init() {
     log.info('Initializing application...');

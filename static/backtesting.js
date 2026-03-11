@@ -396,7 +396,9 @@ async function handleBacktestSubmit(e) {
             const newFwd = forwardBtn.cloneNode(true);
             forwardBtn.parentNode.replaceChild(newFwd, forwardBtn);
             newFwd.addEventListener('click', () => {
-                showNotification('Forward testing not implemented yet.', 'info');
+                if (window.openForwardTestModal) {
+                    window.openForwardTestModal();
+                }
             });
         }
 

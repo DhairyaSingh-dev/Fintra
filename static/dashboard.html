@@ -41,7 +41,6 @@
             <div class="user-details">
                 <div class="user-name" id="user-name"></div>
     </div>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
             <button id="logout-btn" class="logout-btn">Logout</button>
         </div>
 
@@ -303,12 +302,35 @@
 
         <!-- Post‑Backtest Options -->
         <div id="post-backtest-options" class="post-backtest-options hidden">
-            <h3>🚀 What would you like to explore next?</h3>
-            <p>Select an analysis path for your backtest results.</p>
-            <div class="option-buttons">
-                <button id="opt-mc-btn" class="option-btn mc-btn-primary">Monte Carlo Analysis</button>
-                <button id="opt-replay-btn" class="option-btn mc-btn-secondary">Live Replay</button>
-                <button id="opt-forward-btn" class="option-btn mc-btn-secondary">Forward Testing (coming soon)</button>
+            <div class="pbo-header">
+                <h3>Explore Further</h3>
+                <p>Dive deeper into your backtest with these tools</p>
+            </div>
+            <div class="pbo-cards">
+                <button id="opt-mc-btn" class="pbo-card">
+                    <div class="pbo-card-icon">🎲</div>
+                    <div class="pbo-card-body">
+                        <span class="pbo-card-title">Monte Carlo</span>
+                        <span class="pbo-card-desc">Stochastic portfolio simulation</span>
+                    </div>
+                    <span class="pbo-card-arrow">→</span>
+                </button>
+                <button id="opt-replay-btn" class="pbo-card">
+                    <div class="pbo-card-icon">📈</div>
+                    <div class="pbo-card-body">
+                        <span class="pbo-card-title">Live Replay</span>
+                        <span class="pbo-card-desc">Watch 1-min candles play back</span>
+                    </div>
+                    <span class="pbo-card-arrow">→</span>
+                </button>
+                <button id="opt-forward-btn" class="pbo-card pbo-card-accent">
+                    <div class="pbo-card-icon">🎯</div>
+                    <div class="pbo-card-body">
+                        <span class="pbo-card-title">Paper Trade</span>
+                        <span class="pbo-card-desc">Simulate live trading on history</span>
+                    </div>
+                    <span class="pbo-card-arrow">→</span>
+                </button>
             </div>
         </div>
     </div>
@@ -379,6 +401,148 @@
             </div>
         </div>
     </div>
+
+
+    <!-- Forward Test / Paper Trading Modal -->
+    <dialog id="forward-test-modal" class="replay-modal forward-test-modal">
+        <div class="replay-modal-inner">
+            <div class="replay-header">
+                <div class="replay-title">
+                    <span class="replay-icon">🎯</span>
+                    <div>
+                        <h3>Paper Trading</h3>
+                        <span class="replay-subtitle" id="ft-symbol-label">Simulate trading on historical data</span>
+                    </div>
+                </div>
+                <button id="ft-close-btn" class="replay-close-btn">&times;</button>
+            </div>
+
+            <!-- Setup -->
+            <div id="ft-setup" class="replay-setup">
+                <div class="ft-config-section">
+                    <label class="replay-field-label">💰 Starting Capital</label>
+                    <div class="ft-capital-input">
+                        <span class="ft-currency">₹</span>
+                        <input type="number" id="ft-capital" value="100000" min="1000" max="10000000" step="1000" class="ft-input">
+                    </div>
+                </div>
+                <div class="ft-config-section">
+                    <label class="replay-field-label">📦 Position Sizing</label>
+                    <div class="ft-sizing-pills">
+                        <button class="ft-size-pill active" data-pct="25">25%</button>
+                        <button class="ft-size-pill" data-pct="50">50%</button>
+                        <button class="ft-size-pill" data-pct="75">75%</button>
+                        <button class="ft-size-pill" data-pct="100">100%</button>
+                    </div>
+                </div>
+                <div class="replay-date-picker">
+                    <label class="replay-field-label">📅 Select Date</label>
+                    <div class="replay-date-grid" id="ft-date-grid"></div>
+                </div>
+                <div class="replay-time-picker">
+                    <div class="replay-time-group">
+                        <label class="replay-field-label">🕐 Start Time</label>
+                        <div class="replay-time-select">
+                            <select id="ft-hour-start" class="replay-time-dropdown"></select>
+                            <span class="replay-time-sep">:</span>
+                            <select id="ft-min-start" class="replay-time-dropdown"></select>
+                        </div>
+                    </div>
+                    <div class="replay-time-group">
+                        <label class="replay-field-label">🕑 End Time</label>
+                        <div class="replay-time-select">
+                            <select id="ft-hour-end" class="replay-time-dropdown"></select>
+                            <span class="replay-time-sep">:</span>
+                            <select id="ft-min-end" class="replay-time-dropdown"></select>
+                        </div>
+                    </div>
+                    <div class="replay-duration-badge" id="ft-duration-badge">Duration: --</div>
+                </div>
+                <div class="replay-setup-actions">
+                    <button id="ft-launch-btn" class="replay-launch-btn" disabled>
+                        <span>🎯</span> Start Paper Trading
+                    </button>
+                </div>
+            </div>
+
+            <!-- Trading View -->
+            <div id="ft-trading" class="ft-trading" style="display:none;">
+                <div class="replay-chart-container">
+                    <canvas id="ft-chart"></canvas>
+                </div>
+
+                <!-- Portfolio Bar -->
+                <div class="ft-portfolio-bar">
+                    <div class="ft-stat">
+                        <span class="ft-stat-label">Capital</span>
+                        <span class="ft-stat-value" id="ft-cash">₹1,00,000</span>
+                    </div>
+                    <div class="ft-stat">
+                        <span class="ft-stat-label">Position</span>
+                        <span class="ft-stat-value" id="ft-position">None</span>
+                    </div>
+                    <div class="ft-stat">
+                        <span class="ft-stat-label">Unrealised P&amp;L</span>
+                        <span class="ft-stat-value" id="ft-unrealised">₹0</span>
+                    </div>
+                    <div class="ft-stat">
+                        <span class="ft-stat-label">Total P&amp;L</span>
+                        <span class="ft-stat-value" id="ft-total-pnl">₹0</span>
+                    </div>
+                </div>
+
+                <!-- Candle info -->
+                <div class="replay-candle-info" id="ft-candle-info">
+                    <span class="candle-info-item"><b>O</b> <span id="ft-open">--</span></span>
+                    <span class="candle-info-item"><b>H</b> <span id="ft-high">--</span></span>
+                    <span class="candle-info-item"><b>L</b> <span id="ft-low">--</span></span>
+                    <span class="candle-info-item"><b>C</b> <span id="ft-close">--</span></span>
+                    <span class="candle-info-item candle-time"><span id="ft-time">--:--</span></span>
+                </div>
+
+                <!-- Progress -->
+                <div class="replay-progress-container">
+                    <div class="replay-progress-bar" id="ft-progress-bar">
+                        <div class="replay-progress-fill" id="ft-progress-fill"></div>
+                        <div class="replay-progress-thumb" id="ft-progress-thumb"></div>
+                    </div>
+                    <div class="replay-progress-labels">
+                        <span id="ft-candle-counter">0 / 0</span>
+                        <span id="ft-time-label">--:-- → --:--</span>
+                    </div>
+                </div>
+
+                <!-- Trading Actions -->
+                <div class="ft-actions">
+                    <button id="ft-btn-buy" class="ft-action-btn ft-buy">🟢 BUY</button>
+                    <button id="ft-btn-sell" class="ft-action-btn ft-sell" disabled>🔴 SELL</button>
+                    <button id="ft-btn-skip" class="ft-action-btn ft-skip">⏩ SKIP</button>
+                </div>
+
+                <!-- Trade Log -->
+                <div class="ft-trade-log" id="ft-trade-log">
+                    <h4>Trade Log</h4>
+                    <div class="ft-trades-list" id="ft-trades-list">
+                        <p class="ft-no-trades">No trades yet. Start trading!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="ft-results" class="ft-results" style="display:none;">
+                <div class="ft-results-header">
+                    <h3>🏆 Paper Trading Results</h3>
+                </div>
+                <div class="ft-results-grid" id="ft-results-grid"></div>
+                <div class="ft-results-actions">
+                    <button id="ft-btn-restart" class="replay-launch-btn">Try Again</button>
+                    <button id="ft-btn-close-results" class="transport-btn transport-reset" style="padding:12px 24px;width:auto;height:auto;border-radius:10px;">Close</button>
+                </div>
+            </div>
+
+            <div id="ft-status" class="replay-status"></div>
+        </div>
+    </dialog>
 
     <!-- Live Replay Modal -->
     <dialog id="replay-modal" class="replay-modal">

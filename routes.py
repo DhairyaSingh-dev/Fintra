@@ -1828,3 +1828,38 @@ def admin_redis_status():
             status["error"] = str(e)
     
     return jsonify(status), 200
+
+
+# ==================== REPLAY / FORWARD TEST ENDPOINTS ====================
+@api.route('/replay/candles', methods=['GET'])
+def replay_candles():
+    """Return 1-minute OHLCV candles for live replay / forward testing.
+    Query params: symbol, start (ISO), end (ISO)
+    Max 60-minute window, end must be ≥30 days ago (SEBI lag).
+    """
+    symbol = request.args.get('symbol')
+    start = request.args.get('start')
+    end = request.args.get('end')
+
+    if not (symbol and start and end):
+        return jsonify(error='Missing required params: symbol, start, end'), 400
+
+    try:
+        from replay import get_one_min_candles
+        df = get_one_min_candles(symbol, start, end)
+        candles = df.to_dict(orient='records')
+
+        # Serialise timestamps/datetimes to ISO strings
+        for c in candles:
+            for key in list(c.keys()):
+                if hasattr(c[key], 'isoformat'):
+                    c[key] = c[key].isoformat()
+
+        return jsonify(candles=candles, total=len(candles)), 200
+
+    except ValueError as ve:
+        return jsonify(error=str(ve)), 400
+    except Exception as e:
+        logger.error(f"Replay candles error: {e}")
+        return jsonify(error=f"Failed to load candle data: {str(e)}"), 500
+

@@ -9,7 +9,7 @@ from sys import stdout
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from flask_socketio import SocketIO
+# SocketIO removed — replay uses REST endpoint instead
 from sqlalchemy import text
 
 from config import Config
@@ -51,10 +51,7 @@ def create_app():
     # Do NOT use Flask-CORS here — it conflicts with our manual headers.
     # CORS(app, supports_credentials=True, origins=Config.CORS_ORIGINS, ...)
 
-    # Initialize SocketIO for real‑time replay
-    socketio = SocketIO(app, cors_allowed_origins=Config.CORS_ORIGINS)
-    # Expose socketio globally for import by other modules
-    app.socketio = socketio
+    # Note: SocketIO removed — replay/forward-test use REST endpoints
 
     # Register blueprints
     app.register_blueprint(api, url_prefix='/api')
@@ -258,13 +255,7 @@ def create_app():
         logger.info(f" 🔑 JWT Secrets Loaded: {'✅' if Config.ACCESS_TOKEN_JWT_SECRET and Config.REFRESH_TOKEN_JWT_SECRET else '❌ NOT FOUND'}")
         logger.info("=" * 70)
 
-    # Register SocketIO namespaces (Replay)
-    try:
-        from replay_socket import ReplayNamespace
-        socketio.on_namespace(ReplayNamespace('/replay'))
-        logger.info("Replay SocketIO namespace registered")
-    except Exception as e:
-        logger.error(f"Failed to register Replay namespace: {e}")
+    # Replay uses REST endpoint /api/replay/candles (no WebSocket needed)
 
     return app
     
