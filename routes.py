@@ -1860,3 +1860,17 @@ def replay_candles():
         logger.error(f"Replay candles error: {e}")
         return jsonify(error=f"Failed to load candle data: {str(e)}"), 500
 
+
+@api.route('/replay/window', methods=['GET'])
+def replay_window():
+    try:
+        from data_compliance import get_intraday_window
+        start_dt, end_dt = get_intraday_window()
+        return jsonify(
+            window_start=start_dt.isoformat(),
+            window_end=end_dt.isoformat()
+        ), 200
+    except Exception as e:
+        logger.error(f"Replay window error: {e}")
+        return jsonify(error=f"Failed to get replay window: {str(e)}"), 500
+

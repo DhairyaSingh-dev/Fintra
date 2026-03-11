@@ -1,0 +1,65 @@
+============================================================
+INTRADAY DATA SCRAPER REPORT
+Generated: 2026-03-12 01:10:35
+============================================================
+
+SUMMARY
+----------------------------------------
+Total Success: 0
+Total Failures: 10
+
+0-9: 0/7 successful
+A: 0/3 successful
+
+ERRORS
+----------------------------------------
+20MICRONS.NS [SaveError]: Failed to save data for 20MICRONS.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+A2ZINFRA.NS [SaveError]: Failed to save data for A2ZINFRA.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+3MINDIA.NS [SaveError]: Failed to save data for 3MINDIA.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+5PAISA.NS [SaveError]: Failed to save data for 5PAISA.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+360ONE.NS [SaveError]: Failed to save data for 360ONE.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+3PLAND.NS [SaveError]: Failed to save data for 3PLAND.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+63MOONS.NS [SaveError]: Failed to save data for 63MOONS.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+21STCENMGM.NS [SaveError]: Failed to save data for 21STCENMGM.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+AADHARHFC.NS [SaveError]: Failed to save data for AADHARHFC.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.
+AAATECH.NS [SaveError]: Failed to save data for AAATECH.NS: Unable to find a usable engine; tried using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for parquet support. Use pip or conda to install fastparquet.

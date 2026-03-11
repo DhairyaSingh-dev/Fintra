@@ -1,9 +1,11 @@
 import logging
 import pandas as pd
 import datetime
+import os
 from config import Config
 from redis_client import redis_client, init_redis
 from data_providers import fetch_intraday_ohlcv
+from data_compliance import get_intraday_window, get_intraday_parquet_path
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +17,29 @@ def _is_valid_window(start_dt: datetime.datetime, end_dt: datetime.datetime) -> 
     return (end_dt - start_dt).total_seconds() <= 60 * 60 and end_dt > start_dt
 
 def _enforce_sebi_lag(end_dt: datetime.datetime) -> bool:
-    # End must be at least 30 days before now
-    lag = datetime.datetime.utcnow() - datetime.timedelta(days=30)
-    return end_dt <= lag
+    _, window_end = get_intraday_window()
+    return end_dt <= window_end
+
+
+def _load_intraday_parquet(symbol: str, start_dt: datetime.datetime, end_dt: datetime.datetime) -> pd.DataFrame:
+    path = get_intraday_parquet_path(symbol)
+    if not path or not os.path.exists(path):
+        return None
+    df = pd.read_parquet(path)
+    if not isinstance(df.index, pd.DatetimeIndex):
+        date_col = next((c for c in df.columns if c.lower() == 'date'), None)
+        if date_col:
+            df[date_col] = pd.to_datetime(df[date_col])
+            df.set_index(date_col, inplace=True)
+        else:
+            df.index = pd.to_datetime(df.index)
+    df = df[(df.index >= start_dt) & (df.index <= end_dt)].copy()
+    if df.empty:
+        return None
+    df.columns = [col.lower().replace(' ', '_') for col in df.columns]
+    df.columns = [col.title().replace('_', '') for col in df.columns]
+    df.index.name = 'Date'
+    return df
 
 def get_one_min_candles(symbol: str, start_iso: str, end_iso: str) -> pd.DataFrame:
     """Return a DataFrame with 1‑minute OHLCV for the given symbol.
@@ -51,8 +73,12 @@ def get_one_min_candles(symbol: str, start_iso: str, end_iso: str) -> pd.DataFra
             data = json.loads(cached)
             return pd.DataFrame(data)
 
-    # Cache miss – fetch using data providers fallback chain
-    df = fetch_intraday_ohlcv(symbol, start_dt, end_dt)
+    window_start, window_end = get_intraday_window()
+    df = None
+    if start_dt >= window_start and end_dt <= window_end:
+        df = _load_intraday_parquet(symbol, start_dt, end_dt)
+    if df is None or df.empty:
+        df = fetch_intraday_ohlcv(symbol, start_dt, end_dt)
     
     if df is None or df.empty:
         logger.warning("Empty 1‑min data for %s", symbol)

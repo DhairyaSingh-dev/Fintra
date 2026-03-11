@@ -40,6 +40,7 @@ import os
 # Add parent directory to path so we can import from the main app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data_providers import fetch_daily_ohlcv
+from data_compliance import get_intraday_window, INTRADAY_DIRECTORY
 
 # Configure logging
 logging.basicConfig(
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 DATA_DIR = Path(__file__).parent.parent / 'data'
+INTRADAY_DIR = Path(INTRADAY_DIRECTORY)
 SEBI_LAG_DAYS = 31
 UPDATE_BUFFER_DAYS = 7
 REPORT_FILE = 'data_update_report.json'
@@ -75,6 +77,7 @@ class DataUpdatePipeline:
         self.updated_stocks = []
         self.errors = []
         self.skipped_stocks = []
+        self.intraday_errors = []
         
     def get_sebi_compliance_date(self) -> datetime:
         """
@@ -235,8 +238,73 @@ class DataUpdatePipeline:
             logger.error(f"Error updating {symbol}: {e}")
             self.errors.append({'symbol': symbol, 'error': str(e), 'type': 'update'})
             return False
+
+    def validate_intraday_data(self, sample_size: int = 100) -> Dict:
+        if not INTRADAY_DIR.exists():
+            return {
+                'available': False,
+                'message': f'Intraday directory not found: {INTRADAY_DIR}',
+                'checked_files': 0,
+                'errors': 0
+            }
+        files = []
+        for subdir in INTRADAY_DIR.iterdir():
+            if subdir.is_dir():
+                files.extend(subdir.glob('*.parquet'))
+        if not files:
+            return {
+                'available': False,
+                'message': 'No intraday parquet files found',
+                'checked_files': 0,
+                'errors': 0
+            }
+        sample_files = random.sample(files, min(sample_size, len(files)))
+        window_start, window_end = get_intraday_window()
+        required_cols = {'Open', 'High', 'Low', 'Close', 'Volume'}
+        for file_path in sample_files:
+            symbol = file_path.stem
+            try:
+                df = pd.read_parquet(file_path)
+                if not isinstance(df.index, pd.DatetimeIndex):
+                    date_col = next((c for c in df.columns if c.lower() == 'date'), None)
+                    if date_col:
+                        df[date_col] = pd.to_datetime(df[date_col])
+                        df.set_index(date_col, inplace=True)
+                    else:
+                        df.index = pd.to_datetime(df.index)
+                if df.empty:
+                    self.intraday_errors.append({'symbol': symbol, 'error': 'empty'})
+                    continue
+                df.columns = [col.lower().replace(' ', '_') for col in df.columns]
+                df.columns = [col.title().replace('_', '') for col in df.columns]
+                if not required_cols.issubset(set(df.columns)):
+                    self.intraday_errors.append({'symbol': symbol, 'error': 'missing_columns'})
+                    continue
+                min_dt = df.index.min()
+                max_dt = df.index.max()
+                if min_dt < window_start or max_dt > window_end:
+                    self.intraday_errors.append({
+                        'symbol': symbol,
+                        'error': 'out_of_window',
+                        'min': min_dt.isoformat(),
+                        'max': max_dt.isoformat(),
+                        'window_start': window_start.isoformat(),
+                        'window_end': window_end.isoformat()
+                    })
+            except Exception as e:
+                self.intraday_errors.append({'symbol': symbol, 'error': str(e)})
+        return {
+            'available': True,
+            'message': 'Intraday validation complete',
+            'checked_files': len(sample_files),
+            'errors': len(self.intraday_errors),
+            'error_details': self.intraday_errors,
+            'window_start': window_start.isoformat(),
+            'window_end': window_end.isoformat()
+        }
     
-    def run_pipeline(self, sample_size: int = 100, force_update: bool = False) -> Dict:
+    def run_pipeline(self, sample_size: int = 100, force_update: bool = False,
+                     validate_intraday: bool = True, intraday_sample_size: int = 100) -> Dict:
         """
         Run the complete data update pipeline.
         
@@ -306,6 +374,14 @@ class DataUpdatePipeline:
                     'new_date': sebi_compliance.isoformat()
                 })
         
+        intraday_report = None
+        if validate_intraday:
+            intraday_report = self.validate_intraday_data(sample_size=intraday_sample_size)
+
+        total_errors = len(self.errors)
+        if intraday_report:
+            total_errors += intraday_report.get('errors', 0)
+
         # Generate report
         report = {
             'timestamp': datetime.now().isoformat(),
@@ -316,10 +392,11 @@ class DataUpdatePipeline:
             'checked_stocks': len(sample_files),
             'updated_stocks': len(self.updated_stocks),
             'skipped_stocks': len(self.skipped_stocks),
-            'errors': len(self.errors),
+            'errors': total_errors,
             'updated': self.updated_stocks,
             'skipped': self.skipped_stocks,
-            'error_details': self.errors
+            'error_details': self.errors,
+            'intraday_validation': intraday_report
         }
         
         # Save report
@@ -355,16 +432,31 @@ def main():
         default='false',
         help='Force update all stocks regardless of date (true/false)'
     )
+    parser.add_argument(
+        '--validate-intraday',
+        type=str,
+        default='true',
+        help='Validate intraday dataset integrity (true/false)'
+    )
+    parser.add_argument(
+        '--intraday-sample-size',
+        type=int,
+        default=100,
+        help='Number of intraday files to check (default: 100)'
+    )
     
     args = parser.parse_args()
     
     force_update = args.force_update.lower() == 'true'
+    validate_intraday = args.validate_intraday.lower() == 'true'
     
     # Run pipeline
     pipeline = DataUpdatePipeline()
     report = pipeline.run_pipeline(
         sample_size=args.sample_size,
-        force_update=force_update
+        force_update=force_update,
+        validate_intraday=validate_intraday,
+        intraday_sample_size=args.intraday_sample_size
     )
     
     # Exit with error code if there were failures
