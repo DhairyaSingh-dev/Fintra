@@ -2227,12 +2227,13 @@ footer {
 
 .summary-card {
     background: rgba(17, 24, 39, 0.7);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     padding: 20px;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    transform: translateZ(0);
 }
 
 .summary-card:hover {
@@ -2282,16 +2283,17 @@ footer {
 /* Glass Position Card */
 .glass-position-card {
     background: rgba(17, 24, 39, 0.6);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
     padding: 20px;
     margin-bottom: 12px;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
     opacity: 0;
     transform: translateY(20px);
     animation: glassCardEnter 0.5s ease forwards;
+    transform: translateZ(0);
 }
 
 .glass-position-card:hover {
@@ -6355,4 +6357,18 @@ body {
     color: #f59e0b;
     font-size: 0.75rem;
     margin-top: 4px;
+}
+
+/* ==================== REDUCE MOTION ==================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    html {
+        scroll-behavior: auto !important;
+    }
 }

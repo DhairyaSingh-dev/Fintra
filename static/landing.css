@@ -28,6 +28,8 @@ body {
   inset: 0;
   z-index: 0;
   overflow: hidden;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .bg-mesh::before {
@@ -38,12 +40,12 @@ body {
   top: -25%;
   left: -25%;
   background: 
-    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 40% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse at 90% 80%, rgba(20, 184, 166, 0.08) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 40% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 80%, rgba(20, 184, 166, 0.06) 0%, transparent 50%);
   will-change: transform;
-  animation: meshFloat 20s ease-in-out infinite;
+  animation: meshFloat 25s ease-in-out infinite;
 }
 
 @keyframes meshFloat {
@@ -56,10 +58,11 @@ body {
 .orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.4;
+  opacity: 0.25;
+  transform: translateZ(0);
   will-change: transform, opacity;
-  animation: orbFloat 15s ease-in-out infinite;
+  animation: orbFloat 20s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .orb-1 {
@@ -96,31 +99,33 @@ body {
   75% { transform: translate(20px, 10px) scale(1.02); }
 }
 
-/* Grid Pattern Overlay */
+/* Grid Pattern Overlay - Optimized */
 .grid-overlay {
   position: fixed;
   inset: 0;
   z-index: 1;
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 60px 60px;
-  mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 80px 80px;
+  opacity: 0.5;
   pointer-events: none;
+  transform: translateZ(0);
+  will-change: opacity;
 }
 
 /* ==================== GLASS CARD ==================== */
 
 .glass-card {
   background: var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
-  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
-              box-shadow 0.4s ease, 
-              background-color 0.4s ease,
-              border-color 0.4s ease;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              box-shadow 0.3s ease, 
+              border-color 0.3s ease;
+  transform: translateZ(0);
 }
 
 .glass-card:hover {
@@ -540,5 +545,23 @@ body {
   
   .glass-card {
     border-radius: 16px;
+  }
+}
+
+/* ==================== REDUCE MOTION ==================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .bg-mesh, .bg-mesh::before, .orb {
+    animation: none !important;
+  }
+  
+  html {
+    scroll-behavior: auto !important;
   }
 }
