@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script type="application/ld+json">
+<script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "WebSite",
@@ -11,189 +11,245 @@
 }
 </script>
 
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to Fintra | AI Analyst</title>
-    <link rel="icon" type="image/png" href="/fintralogo.png">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            background-color: #020617; 
-            color: white;
-            overflow-x: hidden;
-        }
-
-        #cursor-glow {
-            position: fixed;
-            top: 0; left: 0;
-            width: 500px; height: 500px;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(0,0,0,0) 70%);
-            border-radius: 50%;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            z-index: 0;
-            transition: transform 0.1s ease-out;
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        .glass-card:hover {
-            background: rgba(255, 255, 255, 0.07);
-            border-color: rgba(59, 130, 246, 0.5);
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        }
-
-        .stat-badge {
-            background: rgba(34, 197, 94, 0.1);
-            color: #4ade80;
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fintra | AI-Powered Financial Intelligence</title>
+<link rel="icon" type="image/png" href="/fintralogo.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="landing.css">
 </head>
-<body class="flex flex-col lg:flex-row min-h-screen">
+<body class="relative">
 
-    <div id="cursor-glow"></div>
+  <!-- Animated Background -->
+  <div class="bg-mesh">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+  <div class="grid-overlay"></div>
 
-    <main class="relative z-10 flex flex-col justify-center w-full lg:w-7/12 p-8 lg:p-16 space-y-12">
-        <div>
-            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-6">
-                <span class="relative flex h-2 w-2">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                </span>
-                <span>Production Release Live</span>
+  <div class="relative z-10 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="px-8 py-6 flex justify-between items-center fade-up">
+      <div class="flex items-center gap-3">
+        <img src="/fintralogo.png" alt="Fintra" class="h-10 w-auto">
+        <span class="text-xl font-bold">Fintra</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <button onclick="document.getElementById('demo-section').scrollIntoView({behavior: 'smooth'})" class="text-sm font-medium text-gray-400 hover:text-white transition-colors">
+          Try Demo
+        </button>
+        <button id="header-login-btn" class="glow-btn">
+          <span>Sign In</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col lg:flex-row">
+
+      <!-- Left Side - Hero & Features -->
+      <div class="w-full lg:w-7/12 px-8 lg:px-16 py-8 lg:py-12 flex flex-col justify-center">
+        
+        <!-- Status Badge -->
+        <div class="fade-up fade-up-delay-1 mb-8">
+          <div class="status-badge">
+            <span>Production Ready</span>
+          </div>
+        </div>
+
+        <!-- Hero -->
+        <h1 class="text-4xl lg:text-6xl font-bold mb-6 leading-tight fade-up fade-up-delay-2">
+          <span class="text-gradient">AI-Powered</span><br>
+          Financial Intelligence
+        </h1>
+        
+        <p class="text-lg text-gray-400 max-w-xl leading-relaxed mb-10 fade-up fade-up-delay-3">
+          Institutional-grade quantitative analysis with real-time market data, 
+          AI-driven insights, and Monte Carlo validation. Sub-second latency. 
+          SEBI compliant.
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="flex flex-wrap gap-4 mb-12 fade-up fade-up-delay-4">
+          <button onclick="document.getElementById('demo-section').scrollIntoView({behavior: 'smooth'})" class="glow-btn text-lg px-8 py-4">
+            <span>Try Demo</span>
+          </button>
+          <button id="hero-login-btn" class="outline-btn text-lg px-8 py-4">
+            Sign In
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="flex gap-8 lg:gap-16 mb-12 fade-up fade-up-delay-5">
+          <div class="stat-item">
+            <div class="stat-value">2,500+</div>
+            <div class="stat-label">NSE/BSE Stocks</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">&lt;500ms</div>
+            <div class="stat-label">Monte Carlo</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">Groq</div>
+            <div class="stat-label">AI Powered</div>
+          </div>
+        </div>
+
+        <!-- Feature Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl">
+          <div class="glass-card p-6 fade-up fade-up-delay-3">
+            <div class="feature-icon blue mb-4">📊</div>
+            <h3 class="font-semibold text-lg mb-2">Backtesting Engine</h3>
+            <p class="text-sm text-gray-400">7 strategies with Monte Carlo. 10,000 simulations in under 500ms via WebAssembly.</p>
+          </div>
+          <div class="glass-card p-6 fade-up fade-up-delay-4">
+            <div class="feature-icon purple mb-4">🧠</div>
+            <h3 class="font-semibold text-lg mb-2">Multi-Model AI</h3>
+            <p class="text-sm text-gray-400">Llama 3.3/70B with RAG. 25+ knowledge documents for context-aware insights.</p>
+          </div>
+          <div class="glass-card p-6 fade-up fade-up-delay-5">
+            <div class="feature-icon cyan mb-4">📈</div>
+            <h3 class="font-semibold text-lg mb-2">Real-Time Data</h3>
+            <p class="text-sm text-gray-400">RSI, MACD, SMA, ATR, ADX, Bollinger Bands. Live position tracking.</p>
+          </div>
+          <div class="glass-card p-6 fade-up fade-up-delay-5">
+            <div class="feature-icon teal mb-4">🛡️</div>
+            <h3 class="font-semibold text-lg mb-2">SEBI Compliant</h3>
+            <p class="text-sm text-gray-400">31-day compliance enforcement. Built for transparency and institutional use.</p>
+          </div>
+        </div>
+
+        <!-- Demo Search Section -->
+        <div id="demo-section" class="mt-16 max-w-xl fade-up fade-up-delay-5">
+          <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+            <span class="live-dot"></span>
+            Try the Demo
+          </h3>
+          <p class="text-gray-400 text-sm mb-6">Search any stock to see real-time AI-powered analysis. No login required.</p>
+          
+          <div class="search-demo">
+            <input type="text" id="demo-search-input" placeholder="Search stocks (e.g., RELIANCE, TCS, INFY)..." autocomplete="off">
+            <button class="search-btn">Analyze</button>
+            <div class="search-autocomplete" id="demo-autocomplete"></div>
+          </div>
+
+          <div class="demo-result" id="demo-result">
+            <!-- Loading State -->
+            <div id="demo-loading" style="display: none;" class="flex flex-col items-center justify-center py-8">
+              <div class="spinner"></div>
+              <p class="text-gray-400 text-sm mt-4">Fetching live market data...</p>
             </div>
-            <h1 class="text-5xl lg:text-6xl font-bold mb-6 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-500">
-                AI-Powered Financial <br>Intelligence Platform
-            </h1>
-            <p class="text-gray-400 text-lg max-w-lg leading-relaxed">
-                Production-grade quantitative analysis combining real-time market data, AI-driven insights, and institutional-level backtesting with Monte Carlo validation. Engineered for sub-second latency.
+            <!-- Content -->
+            <div id="demo-content">
+              <div class="stock-header">
+                <div>
+                  <div class="stock-symbol" id="demo-symbol">RELIANCE</div>
+                  <div class="text-sm text-gray-400" id="demo-name">Reliance Industries Ltd</div>
+                </div>
+                <div class="text-right">
+                  <div class="stock-price" id="demo-price">₹1,247.50</div>
+                  <div class="stock-change" id="demo-change">+2.34%</div>
+                </div>
+              </div>
+              <div class="ai-badge">
+                <span>🤖</span> AI Analysis
+              </div>
+              <p class="text-sm text-gray-300 mt-3" id="demo-analysis">
+                Strong bullish momentum with RSI at 65. MACD shows positive crossover. 
+                Volume indicates sustained interest.
+              </p>
+            </div>
+            <button class="demo-cta" id="demo-login-cta">
+              Sign in to unlock full analysis →
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Side - Login Panel -->
+      <div class="w-full lg:w-5/12 flex flex-col justify-center px-8 lg:px-16 py-8 lg:py-12">
+        <div class="glass-card p-8 lg:p-10 max-w-md mx-auto w-full fade-up fade-up-delay-4">
+          <div class="text-center mb-8">
+            <h2 class="text-2xl font-bold mb-2">Welcome to Fintra</h2>
+            <p class="text-gray-400 text-sm">Sign in to access your AI-powered dashboard</p>
+          </div>
+
+          <button id="landing-google-btn" class="w-full flex items-center justify-center gap-3 py-4 px-6 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] mb-6">
+            <svg class="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+
+          <div class="relative my-6">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t border-gray-700"></div>
+            </div>
+            <div class="relative flex justify-center text-sm">
+              <span class="px-4 bg-gray-900 text-gray-500">Secure 256-bit encrypted</span>
+            </div>
+          </div>
+
+          <div class="text-center">
+            <p class="text-xs text-gray-500">
+              By signing in, you agree to our Terms of Service and Privacy Policy
             </p>
+          </div>
+
+          <div class="mt-8 pt-6 border-t border-gray-800">
+            <div class="flex items-center justify-center gap-6 text-sm text-gray-400">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span>SEBI Compliant</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <span>Real-time Data</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 max-w-2xl">
-            <div class="glass-card p-6 rounded-2xl flex items-start space-x-4">
-                <div class="p-3 bg-blue-500/10 rounded-lg text-blue-400">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                </div>
-                <div>
-                    <h3 class="font-semibold text-lg text-white">Institutional-Grade Backtesting</h3>
-                    <p class="text-sm text-gray-500">7 strategies with Monte Carlo validation. 10,000 simulations in &lt;500ms via WebAssembly. ATR-based position sizing and dynamic risk management.</p>
-                </div>
-            </div>
-
-            <div class="glass-card p-6 rounded-2xl flex items-start space-x-4">
-                <div class="p-3 bg-purple-500/10 rounded-lg text-purple-400">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                </div>
-                <div>
-                    <h3 class="font-semibold text-lg text-white">Multi-Model AI Architecture</h3>
-                    <p class="text-sm text-gray-500">Groq-powered Llama 3.3/70B with intelligent load balancing. RAG-enhanced chatbot with 25+ knowledge documents.</p>
-                </div>
-            </div>
-
-            <div class="glass-card p-6 rounded-2xl flex items-start space-x-4">
-                <div class="p-3 bg-green-500/10 rounded-lg text-green-400">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <div>
-                    <h3 class="font-semibold text-lg text-white">Real-Time Market Intelligence</h3>
-                    <p class="text-sm text-gray-500">2,500+ NSE/BSE instruments with RSI, MACD, SMA, ATR, ADX, Bollinger Bands. 31-day SEBI compliance enforced.</p>
-                </div>
-            </div>
+        <!-- Bottom Quote -->
+        <div class="mt-8 text-center max-w-md mx-auto">
+          <p class="text-sm text-gray-500 italic">"The future of retail investing is AI-driven. Fintra leads that charge."</p>
         </div>
+      </div>
+
     </main>
 
-    <section class="relative z-10 flex flex-col w-full lg:w-5/12 bg-slate-900/40 backdrop-blur-2xl border-l border-white/5">
-        
-        <div class="p-8 lg:p-12 border-b border-white/5">
-            <div class="w-full max-w-sm mx-auto space-y-8">
-                <div>
-                    <h2 class="text-2xl font-bold tracking-tight text-white">Welcome</h2>
-                    <p class="mt-1 text-gray-400 text-sm">Sign in to your Fintra dashboard</p>
-                </div>
+    <!-- Footer -->
+    <footer class="px-8 py-6 text-center text-sm text-gray-600">
+      <p>© 2026 Fintra. Built for the next generation of investors.</p>
+    </footer>
 
-                <button id="landing-google-btn" class="w-full flex items-center justify-center space-x-3 py-3.5 px-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all duration-300 transform active:scale-[0.98] shadow-xl shadow-white/5">
-                    <img src="https://www.svgrepo.com/show/355037/google.svg" class="w-5 h-5" alt="Google">
-                    <span>Continue with Google</span>
-                </button>
+  </div>
 
-                <p class="text-center text-[10px] text-gray-500 uppercase tracking-widest font-medium">
-                    Secure 256-bit encrypted authentication
-                </p>
-            </div>
-        </div>
+  <script type="module">
+    import { handleGoogleLogin, checkAuthStatus, log } from './auth.js';
+    import { deps } from './config.js';
 
-        <div class="flex-grow p-8 lg:p-12 overflow-y-auto">
-            <div class="w-full max-w-sm mx-auto">
-                <h4 class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">Market Pulse</h4>
-                
-                <div class="space-y-4">
-                    <div class="glass-card p-4 rounded-xl border border-white/5">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-xs font-medium text-gray-400">Monte Carlo Simulation</span>
-                            <span class="stat-badge">&lt;500ms</span>
-                        </div>
-                        <p class="text-sm text-gray-300">10,000 paths with Heston volatility, Merton jumps, and regime switching. VaR, CVaR, and drawdown analysis.</p>
-                    </div>
+    deps.log = log;
+    deps.DOM = {};
 
-                    <div class="glass-card p-4 rounded-xl border border-white/5">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-xs font-medium text-gray-400">AI Smart Analysis</span>
-                            <span class="text-xs font-bold text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded">Groq Powered</span>
-                        </div>
-                        <p class="text-sm text-gray-300">Sub-300ms AI responses with prompt safety screening and RAG-enhanced context from 25+ knowledge documents.</p>
-                    </div>
+    document.getElementById('landing-google-btn').addEventListener('click', handleGoogleLogin);
+    
+    checkAuthStatus();
+  </script>
 
-                    <div class="glass-card p-4 rounded-xl border border-white/5">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-xs font-medium text-gray-400">Portfolio Management</span>
-                            <span class="text-xs font-bold text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded">Real-Time P&L</span>
-                        </div>
-                        <p class="text-sm text-gray-300">Live position valuation, technical health tracking, sparkline visualization, and AI-powered risk profiles.</p>
-                    </div>
-
-                    <div class="pt-4">
-                        <div class="flex items-center space-x-4 mb-4">
-                            <p class="text-xs text-gray-400">Built for <span class="text-white font-semibold">transparency</span>, <span class="text-white font-semibold">SEBI compliance</span>, and <span class="text-white font-semibold">institutional-grade analysis</span>.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <script>
-        const glow = document.getElementById('cursor-glow');
-        document.addEventListener('mousemove', (e) => {
-            glow.style.left = e.clientX + 'px';
-            glow.style.top = e.clientY + 'px';
-        });
-    </script>
-
-    <script type="module">
-        import { handleGoogleLogin, checkAuthStatus, log } from './auth.js';
-        import { deps } from './config.js';
-        
-        // Initialize minimal deps for auth.js to work
-        deps.log = log; 
-        deps.DOM = {}; // Empty DOM object to prevent errors if auth.js tries to access it
-
-        document.getElementById('landing-google-btn').addEventListener('click', handleGoogleLogin);
-        
-        // Check if already logged in, if so redirect to dashboard
-        checkAuthStatus();
-    </script>
+  <script src="landing.js"></script>
 </body>
 </html>

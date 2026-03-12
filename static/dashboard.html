@@ -60,6 +60,7 @@
                     </div>
                     <button id="searchBtn" class="search-btn" type="submit">Search</button>
                 </form>
+                <div class="search-hint">Press <kbd>/</kbd> or <kbd>Ctrl+K</kbd> to search</div>
             </div>
 
             <div id="loading" class="loading">
@@ -109,7 +110,26 @@
                         </div>
                         
                         <div class="strategy-selector">
-                            <label for="strategy-select">Trading Strategy:</label>
+                            <label for="strategy-select">
+                                Trading Strategy:
+                                <span class="strategy-help-wrapper">
+                                    <span class="strategy-help-icon">?</span>
+                                    <span class="strategy-help-text">
+                                        <span class="strategy-help-title">Strategy Guide</span>
+                                        <ul class="strategy-help-list">
+                                            <li><strong>Composite:</strong> Combines MA, MACD & Volume signals</li>
+                                            <li><strong>Golden Cross:</strong> Buy when 50-day MA crosses above 200-day MA</li>
+                                            <li><strong>RSI:</strong> Buy oversold (&lt;30), Sell overbought (&gt;70)</li>
+                                            <li><strong>MACD:</strong> Buy when MACD crosses signal line</li>
+                                            <li><strong>Momentum:</strong> Buy strong uptrends, sell weak ones</li>
+                                            <li><strong>Mean Reversion:</strong> Buy dips, sell rallies</li>
+                                            <li><strong>Breakout:</strong> Buy new highs, sell new lows</li>
+                                        </ul>
+                                        <div class="strategy-help-pros">✓ Trend-following strategies work well in bull markets</div>
+                                        <div class="strategy-help-cons">⚠ No strategy works in all market conditions</div>
+                                    </span>
+                                </span>
+                            </label>
                             <select id="strategy-select" name="strategy">
                                 <option value="composite">Composite (MA + MACD + Volume)</option>
                                 <option value="golden_cross">Golden Cross (SMA 50/200)</option>

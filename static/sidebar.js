@@ -237,9 +237,20 @@ function getGroupName(groupKey) {
 
 function createSidebarStockItem(stock) {
     return `
-        <div class="sidebar-stock-item" data-symbol="${stock.symbol}">
+        <div class="sidebar-stock-item tooltip" data-symbol="${stock.symbol}">
             <div class="sidebar-stock-symbol">${stock.symbol}</div>
             <div class="sidebar-stock-name">${stock.name}</div>
+            <span class="tooltip-text">
+                <span class="tooltip-title">${stock.symbol}</span>
+                <span class="tooltip-row">
+                    <span class="tooltip-label">Company:</span>
+                    <span class="tooltip-value">${stock.name}</span>
+                </span>
+                <span class="tooltip-row">
+                    <span class="tooltip-label">Sector:</span>
+                    <span class="tooltip-value">Click to view analysis</span>
+                </span>
+            </span>
         </div>
     `;
 }

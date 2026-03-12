@@ -1,10 +1,79 @@
 // ==================== AUTOCOMPLETE ====================
 import { CONFIG, STATE, DOM } from './config.js';
 
+const SEARCH_HISTORY_KEY = 'fintra_search_history';
+const MAX_HISTORY_ITEMS = 5;
+
+function getSearchHistory() {
+    try {
+        return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY)) || [];
+    } catch {
+        return [];
+    }
+}
+
+function addToSearchHistory(symbol) {
+    let history = getSearchHistory();
+    history = history.filter(s => s !== symbol);
+    history.unshift(symbol);
+    history = history.slice(0, MAX_HISTORY_ITEMS);
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+}
+
+function clearSearchHistory() {
+    localStorage.removeItem(SEARCH_HISTORY_KEY);
+}
+
+function showSearchHistory(dropdownElement, inputElement) {
+    const history = getSearchHistory();
+    if (!history.length) return null;
+
+    const historyHtml = `
+        <div class="search-history">
+            <div class="search-history-header">
+                <span>Recent Searches</span>
+                <button class="search-history-clear" data-action="clear-history">Clear</button>
+            </div>
+            ${history.map(symbol => `
+                <div class="history-item" data-symbol="${symbol}">
+                    <span class="history-item-icon">🕐</span>
+                    <span class="history-item-symbol">${symbol}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    dropdownElement.querySelectorAll('.history-item').forEach(item => {
+        item.addEventListener('click', () => {
+            inputElement.value = item.dataset.symbol;
+            addToSearchHistory(item.dataset.symbol);
+            window.selectStock(item.dataset.symbol);
+        });
+    });
+
+    const clearBtn = dropdownElement.querySelector('[data-action="clear-history"]');
+    clearBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearSearchHistory();
+        hideAutocomplete(dropdownElement);
+    });
+
+    return historyHtml;
+}
+
 export function handleAutocompleteInput(e, dropdownElement) {
     const query = e.target.value.trim().toUpperCase();
+    
+    // Show search history when input is empty
     if (!query) {
-        hideAutocomplete(dropdownElement);
+        const history = getSearchHistory();
+        if (history.length > 0) {
+            dropdownElement.innerHTML = '';
+            showSearchHistory(dropdownElement, e.target);
+            dropdownElement.classList.add('active');
+        } else {
+            hideAutocomplete(dropdownElement);
+        }
         return;
     }
     
@@ -97,6 +166,10 @@ export function selectStock(symbol) {
     hideAutocomplete(DOM.autocomplete);
     hideAutocomplete(DOM.modalAutocomplete);
     DOM.symbol.focus();
+    
+    // Add to search history
+    addToSearchHistory(symbol);
+    
     // Trigger a search when a stock is selected from autocomplete
     const sidebarItem = document.querySelector(`.sidebar-stock-item[data-symbol="${symbol}"]`);
     if (sidebarItem) {

@@ -53,12 +53,14 @@ export function initializeBacktesting() {
     if (strategySelect) {
         strategySelect.addEventListener('change', (e) => {
             document.querySelectorAll('.strategy-specific-params').forEach(el => {
-                el.style.display = 'none';
+                el.classList.remove('active');
             });
             const selectedStrategy = e.target.value;
             const targetParams = document.getElementById(`params-${selectedStrategy}`);
             if (targetParams && currentMode === 'advanced') {
-                targetParams.style.display = 'block';
+                // Force reflow before adding active class
+                void targetParams.offsetWidth;
+                targetParams.classList.add('active');
             }
         });
     }
@@ -78,16 +80,30 @@ function setMode(mode) {
     if (mode === 'beginner') {
         if (DOM.beginnerModeBtn) DOM.beginnerModeBtn.classList.add('active');
         if (DOM.advancedModeBtn) DOM.advancedModeBtn.classList.remove('active');
-        if (DOM.advancedParams) DOM.advancedParams.style.display = 'none';
+        
+        // Animate closing
+        if (DOM.advancedParams) {
+            DOM.advancedParams.classList.remove('expanded');
+            setTimeout(() => {
+                if (currentMode === 'beginner') DOM.advancedParams.style.display = 'none';
+            }, 400);
+        }
 
         // Hide all strategy-specific params when leaving advanced
         document.querySelectorAll('.strategy-specific-params').forEach(el => {
-            el.style.display = 'none';
+            el.classList.remove('active');
         });
     } else {
         if (DOM.advancedModeBtn) DOM.advancedModeBtn.classList.add('active');
         if (DOM.beginnerModeBtn) DOM.beginnerModeBtn.classList.remove('active');
-        if (DOM.advancedParams) DOM.advancedParams.style.display = 'block';
+        
+        // Animate opening
+        if (DOM.advancedParams) {
+            DOM.advancedParams.style.display = 'block';
+            // Force reflow
+            void DOM.advancedParams.offsetWidth;
+            DOM.advancedParams.classList.add('expanded');
+        }
 
         // Trigger change event to show relevant dynamic params
         const strategySelect = document.getElementById('strategy-select');
@@ -621,6 +637,7 @@ ${aiSummary}
 }
 
 let loadingInterval = null;
+let progressPercent = 0;
 
 function showLoading() {
     if (DOM.backtestingLoading) {
@@ -650,6 +667,84 @@ function showLoading() {
             }, 3000);
         }
     }
+    
+    // Show progress indicator
+    showProgressIndicator();
+}
+
+function showProgressIndicator() {
+    let progressContainer = document.getElementById('backtest-progress-container');
+    if (!progressContainer) {
+        const form = DOM.backtestingForm;
+        if (!form) return;
+        
+        progressContainer = document.createElement('div');
+        progressContainer.id = 'backtest-progress-container';
+        progressContainer.className = 'backtest-progress-container';
+        progressContainer.innerHTML = `
+            <div class="backtest-progress-header">
+                <span class="backtest-progress-title">Running Backtest</span>
+                <span class="backtest-progress-percent" id="bt-progress-percent">0%</span>
+            </div>
+            <div class="backtest-progress-bar">
+                <div class="backtest-progress-fill" id="bt-progress-fill"></div>
+            </div>
+            <div class="backtest-progress-phase">
+                <div class="backtest-progress-spinner"></div>
+                <span id="bt-progress-phase">Initializing...</span>
+            </div>
+        `;
+        form.insertBefore(progressContainer, form.firstChild);
+    }
+    
+    progressContainer.classList.add('active');
+    progressPercent = 0;
+    updateProgress(0, 'Initializing backtest engine...');
+    
+    // Simulate progress
+    const phases = [
+        { pct: 10, text: 'Loading historical data...' },
+        { pct: 30, text: 'Calculating indicators...' },
+        { pct: 50, text: 'Running strategy simulation...' },
+        { pct: 70, text: 'Computing metrics...' },
+        { pct: 85, text: 'Analyzing results...' },
+        { pct: 95, text: 'Generating AI analysis...' },
+        { pct: 100, text: 'Finalizing...' }
+    ];
+    
+    let phaseIndex = 0;
+    const progressInterval = setInterval(() => {
+        if (phaseIndex < phases.length) {
+            updateProgress(phases[phaseIndex].pct, phases[phaseIndex].text);
+            phaseIndex++;
+        } else {
+            clearInterval(progressInterval);
+        }
+    }, 800);
+    
+    window._backtestProgressInterval = progressInterval;
+}
+
+function updateProgress(percent, phaseText) {
+    const fill = document.getElementById('bt-progress-fill');
+    const percentText = document.getElementById('bt-progress-percent');
+    const phase = document.getElementById('bt-progress-phase');
+    
+    if (fill) fill.style.width = `${percent}%`;
+    if (percentText) percentText.textContent = `${percent}%`;
+    if (phase) phase.textContent = phaseText;
+}
+
+function hideProgressIndicator() {
+    const progressContainer = document.getElementById('backtest-progress-container');
+    if (progressContainer) {
+        progressContainer.classList.remove('active');
+        setTimeout(() => progressContainer.remove(), 300);
+    }
+    
+    if (window._backtestProgressInterval) {
+        clearInterval(window._backtestProgressInterval);
+    }
 }
 
 function hideLoading() {
@@ -662,6 +757,9 @@ function hideLoading() {
         clearInterval(loadingInterval);
         loadingInterval = null;
     }
+    
+    // Hide progress indicator
+    hideProgressIndicator();
 }
 
 function showError(message) {

@@ -14,6 +14,59 @@ import { initializeDataTransparency } from './data_transparency.js';
 import './replay.js';
 import './forward_test.js';
 
+function setupStickyHeader() {
+    const container = document.querySelector('.main-container');
+    const header = document.querySelector('.header');
+    
+    if (!container || !header) return;
+    
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+    
+    function updateStickyHeader() {
+        const scrollY = window.scrollY;
+        const headerHeight = header.offsetHeight;
+        
+        if (scrollY > headerHeight + 100) {
+            container.classList.add('sticky-active');
+            header.classList.add('sticky-header');
+        } else {
+            container.classList.remove('sticky-active');
+            header.classList.remove('sticky-header');
+        }
+        
+        ticking = false;
+    }
+    
+    window.addEventListener('scroll', () => {
+        lastScrollY = window.scrollY;
+        if (!ticking) {
+            window.requestAnimationFrame(updateStickyHeader);
+            ticking = true;
+        }
+    }, { passive: true });
+}
+
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Cmd/Ctrl + K - Focus search
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            const searchInput = document.getElementById('symbol');
+            searchInput?.focus();
+            searchInput?.select();
+        }
+        
+        // / - Focus search (when not in input)
+        if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+            e.preventDefault();
+            const searchInput = document.getElementById('symbol');
+            searchInput?.focus();
+            searchInput?.select();
+        }
+    });
+}
+
 async function init() {
     log.info('Initializing application...');
 
@@ -44,6 +97,8 @@ async function init() {
     initializeMonteCarlo();
     initializeDataInformatics();
     initializeDataTransparency();
+    setupStickyHeader();
+    setupKeyboardShortcuts();
 
     // Step 6: If authenticated and no symbol is selected, show the welcome message.
     if (isAuthenticated && !deps.STATE.currentSymbol) {
