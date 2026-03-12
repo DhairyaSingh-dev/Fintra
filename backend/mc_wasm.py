@@ -40,8 +40,6 @@ class MonteCarloWasmWrapper:
             engine = wasmtime.Engine()
             store = wasmtime.Store(engine)
             module = wasmtime.Module(engine, open(self.wasm_path, 'rb').read())
-            import_wasi = wasmtime.Linker(store.engine)
-            wasmtime = __import__('wasmtime')
             linker = wasmtime.Linker(store.engine)
             # Minimal wrapper; actual API depends on the exported interface from the WASM build
             self.store = store
