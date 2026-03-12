@@ -707,6 +707,24 @@ body {
     padding: 0;
 }
 
+/* Sidebar Scrollbar */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #0F2138;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #2A4C6E;
+    border-radius: 6px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #3B6A98;
+}
+
 .sidebar-stocks {
     padding: 0;
 }
