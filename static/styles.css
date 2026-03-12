@@ -183,7 +183,7 @@ body {
 
 .search-btn {
     padding: 16px 32px;
-    background: var(--fintra-accent-teal);
+    background: #3F7899;
     color: white;
     border: none;
     border-radius: var(--border-radius);
@@ -198,8 +198,8 @@ body {
 
 .search-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 212, 200, 0.3);
-    background: #00c2b6;
+    box-shadow: 0 8px 20px rgba(63, 120, 153, 0.3);
+    background: #36708a;
 }
 
 .search-btn:disabled {
@@ -1409,7 +1409,7 @@ footer {
 }
 
 #chat-send {
-    background: #3b82f6;
+    background: #3F7899;
     color: white;
     border: none;
     border-radius: 20px;
@@ -1431,7 +1431,7 @@ footer {
 }
 
 #chat-toggle {
-    background: #3b82f6;
+    background: #3F7899;
     color: white;
     border: none;
     border-radius: 50%;
@@ -1709,7 +1709,7 @@ footer {
 }
 
 .logout-btn {
-    background: #e53e3e;
+    background: #3F7899;
     color: white;
     border: none;
     padding: 8px 16px;
@@ -1720,7 +1720,7 @@ footer {
 }
 
 .logout-btn:hover {
-    background: #c53030;
+    background: #36708a;
     transform: translateY(-1px);
 }
 
@@ -4607,7 +4607,7 @@ footer {
     bottom: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+    background: #3F7899;
     color: white;
     padding: 12px 24px;
     z-index: 1000;
