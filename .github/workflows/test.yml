@@ -233,10 +233,11 @@ jobs:
             body: report
           });
 
-  # Job 3: Lint checks
+  # Job 3: Code Quality Checks
   lint:
     name: Code Quality Checks
     runs-on: ubuntu-latest
+    
     steps:
     - uses: actions/checkout@v4
 
@@ -249,20 +250,102 @@ jobs:
       run: |
         pip install flake8 black isort
 
-    - name: Run flake8
+    - name: Run flake8 (critical errors)
+      id: flake8_critical
       run: |
-        echo "### Running flake8..." >> $GITHUB_STEP_SUMMARY
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        echo "## 🔍 Code Quality Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Run flake8 for critical errors only (syntax, undefined names, etc.)
+        OUTPUT=$(flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics 2>&1) || true
+        COUNT=$(echo "$OUTPUT" | grep -c "E9\|F63\|F7\|F82" || echo "0")
+        
+        if [ -n "$OUTPUT" ] && [ "$COUNT" -gt 0 ]; then
+          echo "### ❌ Critical Errors (flake8)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "critical_errors=$COUNT" >> $GITHUB_OUTPUT
+          exit 1
+        else
+          echo "### ✅ No Critical Errors (flake8)" >> $GITHUB_STEP_SUMMARY
+          echo "critical_errors=0" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run flake8 (style warnings)
+      id: flake8_style
+      run: |
+        # Run flake8 for style issues (non-blocking)
+        OUTPUT=$(flake8 . --count --exclude=.git,__pycache__,build,dist,venv,.eggs,*.egg \
+          --ignore=E501,W503,W504,E203,E302,E305,E402,W291,W293 \
+          --max-line-length=100 2>&1) || true
+        COUNT=$(echo "$OUTPUT" | tail -1 | grep -oP '\d+' || echo "0")
+        
+        if [ -n "$OUTPUT" ] && [ "$COUNT" -gt 0 ]; then
+          echo "### ⚠️ Style Warnings (flake8)" >> $GITHUB_STEP_SUMMARY
+          echo "_These are non-blocking style suggestions_" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" | head -50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "style_warnings=$COUNT" >> $GITHUB_OUTPUT
+        else
+          echo "### ✅ No Style Warnings (flake8)" >> $GITHUB_STEP_SUMMARY
+          echo "style_warnings=0" >> $GITHUB_OUTPUT
+        fi
       continue-on-error: true
 
     - name: Check code formatting with black
+      id: black
       run: |
-        echo "### Checking black formatting..." >> $GITHUB_STEP_SUMMARY
-        black --check --diff . || true
+        OUTPUT=$(black --check --diff . 2>&1) || true
+        
+        if echo "$OUTPUT" | grep -q "would reformat"; then
+          echo "### ⚠️ Black Formatting Issues" >> $GITHUB_STEP_SUMMARY
+          echo "_Run \`black .\` locally to fix_" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" | head -100 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "needs_formatting=true" >> $GITHUB_OUTPUT
+        else
+          echo "### ✅ Code Formatting (black)" >> $GITHUB_STEP_SUMMARY
+          echo "needs_formatting=false" >> $GITHUB_OUTPUT
+        fi
       continue-on-error: true
 
     - name: Check imports with isort
+      id: isort
       run: |
-        echo "### Checking import order..." >> $GITHUB_STEP_SUMMARY
-        isort --check-only --diff . || true
+        OUTPUT=$(isort --check-only --diff . 2>&1) || true
+        
+        if echo "$OUTPUT" | grep -q "ERROR"; then
+          echo "### ⚠️ Import Order Issues (isort)" >> $GITHUB_STEP_SUMMARY
+          echo "_Run \`isort .\` locally to fix_" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" | head -100 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "needs_import_sort=true" >> $GITHUB_OUTPUT
+        else
+          echo "### ✅ Import Order (isort)" >> $GITHUB_STEP_SUMMARY
+          echo "needs_import_sort=false" >> $GITHUB_OUTPUT
+        fi
       continue-on-error: true
+
+    - name: Final quality summary
+      run: |
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📋 Quality Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        CRITICAL=${{ steps.flake8_critical.outputs.critical_errors }}
+        STYLE=${{ steps.flake8_style.outputs.style_warnings }}
+        BLACK=${{ steps.black.outputs.needs_formatting }}
+        ISORT=${{ steps.isort.outputs.needs_import_sort }}
+        
+        echo "| Check | Status | Details |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Critical Errors | $([ "$CRITICAL" = "0" ] && echo '✅ Pass' || echo '❌ Fail') | ${CRITICAL:-0} errors |" >> $GITHUB_STEP_SUMMARY
+        echo "| Style Warnings | $([ "$STYLE" = "0" ] && echo '✅ Pass' || echo '⚠️ Warning') | ${STYLE:-0} warnings |" >> $GITHUB_STEP_SUMMARY
+        echo "| Black Formatting | $([ "$BLACK" = "true" ] && echo '⚠️ Warning' || echo '✅ Pass') | - |" >> $GITHUB_STEP_SUMMARY
+        echo "| Import Order | $([ "$ISORT" = "true" ] && echo '⚠️ Warning' || echo '✅ Pass') | - |" >> $GITHUB_STEP_SUMMARY
