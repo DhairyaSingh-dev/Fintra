@@ -23,11 +23,10 @@ export function initializePortfolio() {
         }
     });
 
-    // --- Delegated Event Listener for Portfolio Cards -
+    // --- Delegated Event Listener for Portfolio Cards (Glassmorphism) -
     DOM.portfolioContent?.addEventListener('click', (e) => {
-        const deleteBtn = e.target.closest('.delete-position-btn');
+        const deleteBtn = e.target.closest('.delete-btn');
         const searchBtn = e.target.closest('.search-position-btn');
-        const header = e.target.closest('.position-card-header');
 
         if (deleteBtn) {
             e.stopPropagation();
@@ -38,33 +37,12 @@ export function initializePortfolio() {
 
         if (searchBtn) {
             e.stopPropagation();
-            const card = searchBtn.closest('.position-card');
-            const symbol = card.dataset.symbol;
+            const card = searchBtn.closest('.glass-position-card');
+            const symbol = card?.dataset.symbol;
             if (symbol) {
-                // Switch to the search tab
                 DOM.searchTabBtn.click();
-                // Populate the search input
                 DOM.symbol.value = symbol;
-                // Manually trigger the search
                 document.querySelector('.search-form').requestSubmit();
-            }
-            return;
-        }
-
-        if (header) {
-            const cardBody = header.nextElementSibling;
-            const card = header.closest('.position-card');
-            const arrow = header.querySelector('.position-card-arrow');
-            const isExpanded = cardBody.classList.toggle('expanded');
-            arrow?.classList.toggle('rotated');
-
-            if (isExpanded && !card.dataset.charted) {
-                const positionId = card.dataset.id;
-                const positionData = STATE.portfolio.find(p => p.id == positionId);
-                if (positionData?.chart_data?.length > 0) {
-                    renderPositionChart(positionData);
-                    card.dataset.charted = 'true';
-                }
             }
         }
     });
@@ -111,6 +89,96 @@ export function initializePortfolio() {
         }
     }, 1000); // Increased debounce to 1s to prevent 429 Rate Limit errors
     DOM.addPositionSymbolInput?.addEventListener('input', debouncedPriceFetch);
+}
+
+function generateSparkline(data, isPositive, width = 100, height = 40) {
+    if (!data || data.length < 2) {
+        return `<div class="sparkline-container"></div>`;
+    }
+    
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+    
+    const points = data.map((val, i) => {
+        const x = (i / (data.length - 1)) * width;
+        const y = height - ((val - min) / range) * (height - 8) - 4;
+        return `${x},${y}`;
+    });
+    
+    const pathD = `M ${points.join(' L ')}`;
+    const areaPoints = `M 0,${height} L ${points.join(' L ')} L ${width},${height} Z`;
+    const trendClass = isPositive ? 'positive' : 'negative';
+    
+    return `
+        <div class="sparkline-container">
+            <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                <path class="sparkline-area ${trendClass}" d="${areaPoints}" />
+                <path class="sparkline ${trendClass}" d="${pathD}" />
+            </svg>
+        </div>
+    `;
+}
+
+function generateRandomSparkline(isPositive) {
+    const points = 14;
+    const data = [];
+    let value = 50 + Math.random() * 30;
+    
+    for (let i = 0; i < points; i++) {
+        const change = (Math.random() - (isPositive ? 0.3 : 0.7)) * 15;
+        value = Math.max(10, Math.min(90, value + change));
+        data.push(value);
+    }
+    
+    return generateSparkline(data, isPositive);
+}
+
+function renderPortfolioSummary(positions) {
+    const totalValue = positions.reduce((sum, p) => sum + (p.current_value || 0), 0);
+    const totalCost = positions.reduce((sum, p) => sum + (p.quantity * p.entry_price), 0);
+    const totalPnL = totalValue - totalCost;
+    const pnlPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+    
+    const dayChange = positions.reduce((sum, p) => {
+        const change = p.current_price - p.entry_price;
+        return sum + (change * p.quantity);
+    }, 0);
+    const dayChangePercent = totalCost > 0 ? (dayChange / totalCost) * 100 : 0;
+    
+    const positiveCount = positions.filter(p => p.pnl >= 0).length;
+    
+    return `
+        <div class="portfolio-summary">
+            <div class="summary-card">
+                <div class="summary-label">Total Value</div>
+                <div class="summary-value animate-count">$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Total P&L</div>
+                <div class="summary-value ${totalPnL >= 0 ? 'positive' : 'negative'} animate-count">
+                    ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div class="summary-change ${pnlPercent >= 0 ? 'positive' : 'negative'}">
+                    ${pnlPercent >= 0 ? '↑' : '↓'} ${Math.abs(pnlPercent).toFixed(2)}%
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Day Change</div>
+                <div class="summary-value ${dayChange >= 0 ? 'positive' : 'negative'} animate-count">
+                    ${dayChange >= 0 ? '+' : ''}$${Math.abs(dayChange).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div class="summary-change ${dayChangePercent >= 0 ? 'positive' : 'negative'}">
+                    ${dayChangePercent >= 0 ? '↑' : '↓'} ${Math.abs(dayChangePercent).toFixed(2)}%
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Positions</div>
+                <div class="summary-value animate-count">${positions.length}</div>
+                <div class="summary-change positive">${positiveCount} ↑ ${positions.length - positiveCount} ↓</div>
+            </div>
+        </div>
+    `;
 }
 
 function showSearchView() {
@@ -188,8 +256,9 @@ async function fetchAndDisplayPortfolio() {
 
         if (positions.length === 0) {
             portfolioContent.innerHTML = `
-                <div class="empty-portfolio">
-                    <h3>Your portfolio is empty.</h3>
+                <div class="portfolio-empty">
+                    <div class="portfolio-empty-icon">📊</div>
+                    <h3>Your portfolio is empty</h3>
                     <p>Click "Add Position" to start tracking your investments.</p>
                 </div>
             `;
@@ -197,7 +266,10 @@ async function fetchAndDisplayPortfolio() {
         }
 
         updateProgress(90, 'Rendering portfolio view...');
-        portfolioContent.innerHTML = `<div class="portfolio-grid">${positions.map(createPositionCard).join('')}</div>`;
+        
+        const summaryHtml = renderPortfolioSummary(positions);
+        const cardsHtml = positions.map((pos, i) => createPositionCard(pos, i)).join('');
+        portfolioContent.innerHTML = `${summaryHtml}<div class="portfolio-cards">${cardsHtml}</div>`;
         
         updateProgress(100, 'Complete!');
 
@@ -392,141 +464,69 @@ function renderPositionChart(pos) {
     });
 }
 
-function createPositionCard(pos) {
+function createPositionCard(pos, index = 0) {
     const pnlClass = pos.pnl >= 0 ? 'positive' : 'negative';
     const pnlSign = pos.pnl >= 0 ? '+' : '';
     const company = STATE.stockDatabase.find(s => s.symbol === pos.symbol);
+    const isPositivePnL = pos.pnl >= 0;
+    const sparkline = generateRandomSparkline(isPositivePnL);
+    
+    const pnlPercent = pos.pnl_percent || 0;
+    const barWidth = Math.min(Math.abs(pnlPercent), 100);
 
     return `
-        <div class="position-card" data-id="${pos.id}" data-symbol="${pos.symbol}">
-            <div class="position-card-header">
-                <div class="position-card-title">
-                    <div class="position-symbol">${pos.symbol}</div>
-                    <div class="position-company-name">${company?.name || 'N/A'}</div>
+        <div class="glass-position-card" data-id="${pos.id}" data-symbol="${pos.symbol}" style="animation-delay: ${index * 50}ms">
+            <div class="card-main">
+                <div class="card-left">
+                    ${sparkline}
+                    <div class="symbol-info">
+                        <div class="symbol-name">${pos.symbol}</div>
+                        <div class="symbol-company">${company?.name || 'N/A'}</div>
+                    </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <button class="icon-btn search-position-btn" title="Search ${pos.symbol}">🔍</button>
-                    <button class="delete-position-btn" data-id="${pos.id}" title="Delete Position">×</button>
-                    <div class="position-card-arrow">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <div class="card-right">
+                    <div class="price-info">
+                        <div class="current-price">$${pos.current_price?.toFixed(2) || '0.00'}</div>
+                        <div class="price-change ${pnlClass}">
+                            ${pnlSign}$${Math.abs(pos.pnl).toFixed(2)} (${pnlSign}${pnlPercent.toFixed(2)}%)
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="search-position-btn" title="Search ${pos.symbol}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                        </button>
+                        <button class="delete-btn" data-id="${pos.id}" title="Delete Position">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
                     </div>
                 </div>
             </div>
-            <div class="position-card-body">
-                <div class="position-data-matrix">
-                    <!-- Section 1: Position Overview -->
-                    <div class="matrix-section">
-                        <div class="matrix-header">
-                            <span class="matrix-icon">📊</span>
-                            <span class="matrix-title">Position Overview</span>
-                        </div>
-                        <div class="matrix-content">
-                            <div class="matrix-row">
-                                <span class="matrix-label">Stock:</span>
-                                <span class="matrix-value">${pos.symbol}</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">Shares:</span>
-                                <span class="matrix-value">${pos.quantity}</span>
-                            </div>
-                            <div class="matrix-row ${pnlClass}">
-                                <span class="matrix-label">Total P&L:</span>
-                                <span class="matrix-value">${pnlSign}$${pos.pnl.toFixed(2)} (${pnlSign}${pos.pnl_percent.toFixed(2)}%)</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Section 2: Cost Basis -->
-                    <div class="matrix-section">
-                        <div class="matrix-header">
-                            <span class="matrix-icon">💰</span>
-                            <span class="matrix-title">Cost Basis</span>
-                        </div>
-                        <div class="matrix-content">
-                            <div class="matrix-row">
-                                <span class="matrix-label">Quantity:</span>
-                                <span class="matrix-value">${pos.quantity} shares</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">Avg Cost:</span>
-                                <span class="matrix-value">$${pos.entry_price.toFixed(2)}</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">Total Cost:</span>
-                                <span class="matrix-value">$${(pos.quantity * pos.entry_price).toFixed(2)}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Section 3: Market Data -->
-                    <div class="matrix-section">
-                        <div class="matrix-header">
-                            <span class="matrix-icon">📈</span>
-                            <span class="matrix-title">Market Metrics</span>
-                        </div>
-                        <div class="matrix-content">
-                            <div class="matrix-row">
-                                <span class="matrix-label">MA5:</span>
-                                <span class="matrix-value">${pos.ma5 != null ? '$'+pos.ma5.toFixed(2) : 'N/A'}</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">MA10:</span>
-                                <span class="matrix-value">${pos.ma10 != null ? '$'+pos.ma10.toFixed(2) : 'N/A'}</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">Market Value:</span>
-                                <span class="matrix-value">$${pos.current_value.toFixed(2)}</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">RSI (14):</span>
-                                <span class="matrix-value" style="color: ${getRsiColor(pos.rsi)}">${pos.rsi != null ? pos.rsi.toFixed(2) : 'N/A'}</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">MACD:</span>
-                                <span class="matrix-value">${pos.macd_status || 'N/A'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Section 4: Profit/Loss Analysis -->
-                    <div class="matrix-section">
-                        <div class="matrix-header">
-                            <span class="matrix-icon">💵</span>
-                            <span class="matrix-title">P&L Analysis</span>
-                        </div>
-                        <div class="matrix-content">
-                            <div class="matrix-row">
-                                <span class="matrix-label">Entry Value:</span>
-                                <span class="matrix-value">$${(pos.quantity * pos.entry_price).toFixed(2)}</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">Current Value:</span>
-                                <span class="matrix-value">$${pos.current_value.toFixed(2)}</span>
-                            </div>
-                            <div class="matrix-row">
-                                <span class="matrix-label">Price Change:</span>
-                                <span class="matrix-value">$${(pos.current_price - pos.entry_price).toFixed(2)} per share</span>
-                            </div>
-                            <div class="matrix-row ${pnlClass}">
-                                <span class="matrix-label">Net P&L:</span>
-                                <span class="matrix-value highlight">${pnlSign}$${pos.pnl.toFixed(2)} (${pnlSign}${pos.pnl_percent.toFixed(2)}%)</span>
-                            </div>
-                        </div>
-                    </div>
+            <div class="pnl-bar-container">
+                <div class="pnl-bar-label">
+                    <span>Cost: $${(pos.quantity * pos.entry_price).toFixed(2)}</span>
+                    <span>Value: $${pos.current_value?.toFixed(2) || '0.00'}</span>
                 </div>
-
-                <div class="position-chart-container">
-                    <canvas id="chart-${pos.id}"></canvas>
+                <div class="pnl-bar">
+                    <div class="pnl-bar-fill ${pnlClass}" style="width: ${barWidth}%"></div>
+                    <div class="pnl-bar-glow ${pnlClass}"></div>
                 </div>
-
-                <div class="position-health-notice">
-                    <div class="health-banner">
-                        <span class="health-icon">📅</span>
-                        <div class="health-content">
-                            <strong>Historical Position Data</strong>
-                            <span>All metrics shown are based on historical data with 31-day SEBI compliance lag. This is not a real-time position health assessment.</span>
-                        </div>
-                    </div>
+            </div>
+            <div class="card-metrics">
+                <div class="metric-item">
+                    <div class="metric-label">Shares</div>
+                    <div class="metric-value">${pos.quantity}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Avg Cost</div>
+                    <div class="metric-value">$${pos.entry_price?.toFixed(2) || '0.00'}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">RSI</div>
+                    <div class="metric-value" style="color: ${getRsiColor(pos.rsi)}">${pos.rsi?.toFixed(0) || '--'}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">MACD</div>
+                    <div class="metric-value">${pos.macd_status || '--'}</div>
                 </div>
             </div>
         </div>

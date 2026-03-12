@@ -1759,21 +1759,23 @@ footer {
 }
 
 .add-position-btn {
-    background: var(--fintra-accent-teal);
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
     color: white;
     border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-size: 1rem;
-    font-weight: 700;
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-size: 0.95rem;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .add-position-btn:hover {
-    background: #00c2b6;
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 212, 200, 0.2);
+    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
 }
 
 .empty-portfolio {
