@@ -154,7 +154,6 @@ export async function checkAuthStatus() {
 
 export async function handleLogout(showNotify = true) {
     try {
-        // --- MODIFIED: Add auth header to fetch call ---
         await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, {
             method: 'POST',
             credentials: 'include',
@@ -165,9 +164,9 @@ export async function handleLogout(showNotify = true) {
     } finally {
         STATE.isAuthenticated = false;
         STATE.user = null;
-        setAuthToken(null); // --- NEW: Clear the token ---
-        localStorage.removeItem(CONFIG.SESSION_STORAGE_KEY); // Clear the persisted session
-        window.location.href = '/'; // Redirect to landing page
+        setAuthToken(null);
+        localStorage.removeItem(CONFIG.SESSION_STORAGE_KEY);
+        window.location.href = '/';
     }
 }
 

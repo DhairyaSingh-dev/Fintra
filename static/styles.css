@@ -1633,6 +1633,57 @@ footer {
     transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
+/* Make header sticky without layout shifts */
+.header.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: linear-gradient(135deg, var(--fintra-dark-blue) 0%, #1c3d5e 100%);
+    padding: 12px 20px;
+    margin: 0 -20px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    transition: none;
+    will-change: scroll-position;
+}
+
+.header.sticky-header .header {
+    margin-bottom: 0;
+    padding: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 auto;
+    max-width: 1000px;
+}
+
+.header.sticky-header h1 {
+    font-size: 1.5rem;
+    margin-bottom: 0;
+}
+
+.header.sticky-header p {
+    display: none;
+}
+
+/* View tabs sticky with header */
+.view-tabs.sticky-header {
+    position: sticky;
+    top: 60px;
+    z-index: 99;
+    background: var(--bg-gradient);
+    padding: 12px 20px;
+    margin: 0 -20px;
+    backdrop-filter: blur(10px);
+    transition: none;
+    will-change: scroll-position;
+}
+
+.view-tabs.sticky-header .view-tab {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+}
+
 .user-avatar {
     width: 36px;
     height: 36px;
@@ -5955,53 +6006,6 @@ body {
     max-width: 1000px;
     margin: 0 auto;
     transition: all 0.3s ease;
-}
-
-.sticky-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: linear-gradient(135deg, var(--fintra-dark-blue) 0%, #1c3d5e 100%);
-    padding: 16px 20px;
-    margin: -40px -20px 20px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    transition: all 0.3s ease;
-}
-
-.sticky-header .header {
-    margin-bottom: 0;
-    padding-top: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.sticky-header .header h1 {
-    font-size: 1.5rem;
-    margin-bottom: 0;
-}
-
-.sticky-header .header p {
-    display: none;
-}
-
-.sticky-header .view-tabs {
-    margin-bottom: 0;
-    gap: 8px;
-}
-
-.sticky-header .view-tab {
-    padding: 8px 16px;
-    font-size: 0.85rem;
-}
-
-.container.sticky-active {
-    margin-top: 80px;
-}
-
-.container.sticky-active .header {
-    display: none;
 }
 
 /* ==================== HOVER TOOLTIPS ==================== */

@@ -15,36 +15,42 @@ import './replay.js';
 import './forward_test.js';
 
 function setupStickyHeader() {
-    const container = document.querySelector('.main-container');
     const header = document.querySelector('.header');
+    const userInfoBar = document.getElementById('user-info-bar');
+    const viewTabs = document.querySelector('.view-tabs');
     
-    if (!container || !header) return;
+    if (!header) return;
     
-    let lastScrollY = window.scrollY;
-    let ticking = false;
+    const elements = [header, userInfoBar, viewTabs].filter(Boolean);
+    let isSticky = false;
     
     function updateStickyHeader() {
         const scrollY = window.scrollY;
-        const headerHeight = header.offsetHeight;
+        const threshold = 120; // Reduced threshold
         
-        if (scrollY > headerHeight + 100) {
-            container.classList.add('sticky-active');
-            header.classList.add('sticky-header');
-        } else {
-            container.classList.remove('sticky-active');
-            header.classList.remove('sticky-header');
+        if (scrollY > threshold && !isSticky) {
+            isSticky = true;
+            elements.forEach(el => el.classList.add('sticky-header'));
+        } else if (scrollY <= threshold && isSticky) {
+            isSticky = false;
+            elements.forEach(el => el.classList.remove('sticky-header'));
         }
-        
-        ticking = false;
     }
     
-    window.addEventListener('scroll', () => {
-        lastScrollY = window.scrollY;
-        if (!ticking) {
-            window.requestAnimationFrame(updateStickyHeader);
-            ticking = true;
-        }
-    }, { passive: true });
+    // Use passive listener with a small debounce
+    let scrollTimeout;
+    const handleScroll = () => {
+        if (scrollTimeout) return;
+        scrollTimeout = setTimeout(() => {
+            updateStickyHeader();
+            scrollTimeout = null;
+        }, 16); // ~60fps
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Initial check after layout
+    setTimeout(updateStickyHeader, 100);
 }
 
 function setupKeyboardShortcuts() {
