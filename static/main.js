@@ -14,45 +14,6 @@ import { initializeDataTransparency } from './data_transparency.js';
 import './replay.js';
 import './forward_test.js';
 
-function setupStickyHeader() {
-    const header = document.querySelector('.header');
-    const userInfoBar = document.getElementById('user-info-bar');
-    const viewTabs = document.querySelector('.view-tabs');
-    
-    if (!header) return;
-    
-    const elements = [header, userInfoBar, viewTabs].filter(Boolean);
-    let isSticky = false;
-    
-    function updateStickyHeader() {
-        const scrollY = window.scrollY;
-        const threshold = 120; // Reduced threshold
-        
-        if (scrollY > threshold && !isSticky) {
-            isSticky = true;
-            elements.forEach(el => el.classList.add('sticky-header'));
-        } else if (scrollY <= threshold && isSticky) {
-            isSticky = false;
-            elements.forEach(el => el.classList.remove('sticky-header'));
-        }
-    }
-    
-    // Use passive listener with a small debounce
-    let scrollTimeout;
-    const handleScroll = () => {
-        if (scrollTimeout) return;
-        scrollTimeout = setTimeout(() => {
-            updateStickyHeader();
-            scrollTimeout = null;
-        }, 16); // ~60fps
-    };
-    
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Initial check after layout
-    setTimeout(updateStickyHeader, 100);
-}
-
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
         // Cmd/Ctrl + K - Focus search
@@ -103,7 +64,6 @@ async function init() {
     initializeMonteCarlo();
     initializeDataInformatics();
     initializeDataTransparency();
-    setupStickyHeader();
     setupKeyboardShortcuts();
 
     // Step 6: If authenticated and no symbol is selected, show the welcome message.
