@@ -49,7 +49,12 @@ export function displayData(data) {
     document.getElementById('output').appendChild(grid);
 
     // Reset chart tabs to default (OHLCV) when new data is loaded
+    // First, remove duplicate code - the tabs event listener below handles this
+    
+    // Add event listeners for chart tabs
     const tabs = document.querySelectorAll('.chart-tab');
+    
+    // Reset chart tabs to default (OHLCV) when new data is loaded
     tabs.forEach(t => t.classList.remove('active'));
     const ohlcvTab = document.querySelector('.chart-tab[data-chart="ohlcv"]');
     if (ohlcvTab) ohlcvTab.classList.add('active');
@@ -63,9 +68,7 @@ export function displayData(data) {
         ohlcvContainer.classList.add('active');
         ohlcvContainer.style.display = 'block';
     }
-
-    // Add event listeners for chart tabs
-    const tabs = document.querySelectorAll('.chart-tab');
+    
     tabs.forEach(tab => {
         tab.addEventListener('click', (e) => {
             const chartType = e.target.dataset.chart;
