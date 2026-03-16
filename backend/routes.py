@@ -455,25 +455,36 @@ def logout():
     try:
         logger.info("User logout initiated.")
         response = jsonify(success=True, message="Logged out")
-        # Must match the SameSite and Secure values used when setting the cookie
-        is_production = current_app.config.get("SESSION_COOKIE_SECURE", False)
-        samesite = current_app.config.get("SESSION_COOKIE_SAMESITE", "Lax")
+
+        # Get cookie settings - must match what was used when setting the cookie
+        is_production = current_app.config.get("SESSION_COOKIE_SECURE", True)
+        samesite = current_app.config.get("SESSION_COOKIE_SAMESITE", "None")
+
+        # Clear access token cookie
         response.set_cookie(
             "access_token",
             "",
             max_age=0,
             path="/",
+            domain=None,  # Auto-detect domain
             samesite=samesite,
             secure=is_production,
+            httponly=True,
         )
+
+        # Clear refresh token cookie
         response.set_cookie(
             "refresh_token",
             "",
             max_age=0,
             path="/",
+            domain=None,
             samesite=samesite,
             secure=is_production,
+            httponly=True,
         )
+
+        logger.info("Cookies cleared successfully")
         return response, 200
     except Exception as e:
         logger.error(f"❌ Logout error: {e}")

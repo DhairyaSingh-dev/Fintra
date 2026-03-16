@@ -162,10 +162,20 @@ export async function handleLogout(showNotify = true) {
     } catch (error) {
         deps.log.warn('Logout request to backend failed, but logging out on client-side anyway.', error);
     } finally {
+        // Clear all auth state
         STATE.isAuthenticated = false;
         STATE.user = null;
         setAuthToken(null);
         localStorage.removeItem(CONFIG.SESSION_STORAGE_KEY);
+        
+        // Explicitly clear cookies client-side as backup
+        document.cookie = 'access_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie = 'refresh_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        
+        // Clear sessionStorage
+        sessionStorage.clear();
+        
+        // Redirect to home
         window.location.href = '/';
     }
 }
