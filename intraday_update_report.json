@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-03-16T12:02:47.916374",
+  "pipeline": "intraday",
+  "window_start": "2026-02-14T00:00:00",
+  "window_end": "2026-03-16T12:02:47.915336",
+  "window_days": 31,
+  "total_symbols": 1,
+  "attempted": 1,
+  "succeeded": 1,
+  "skipped": 0,
+  "failed": 0,
+  "pruned_files": 0,
+  "validation_errors": 0,
+  "updated": [
+    {
+      "symbol": "A.NS"
+    }
+  ],
+  "skipped_list": [],
+  "pruned": [],
+  "error_details": [],
+  "validation_results": []
+}

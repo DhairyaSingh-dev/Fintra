@@ -25,13 +25,21 @@ on:
         required: false
         default: 'false'
       intraday_max_symbols:
-        description: 'Max intraday symbols (empty = all)'
+        description: 'Max intraday symbols (empty = all, uses batching)'
         required: false
         default: ''
       intraday_min_rows:
         description: 'Minimum rows for intraday files'
         required: false
         default: '0'
+      intraday_batch_size:
+        description: 'Batch size for intraday (default: 200)'
+        required: false
+        default: '200'
+      intraday_batch_delay:
+        description: 'Delay between batches in seconds (default: 45)'
+        required: false
+        default: '45'
 
 permissions:
   contents: write
@@ -182,6 +190,9 @@ jobs:
         if [ -n "${{ github.event.inputs.intraday_max_symbols }}" ]; then
           ARGS="$ARGS --max-symbols ${{ github.event.inputs.intraday_max_symbols }}"
         fi
+        # Always use batching to avoid rate limits
+        ARGS="$ARGS --batch-size ${{ github.event.inputs.intraday_batch_size || '200' }}"
+        ARGS="$ARGS --batch-delay ${{ github.event.inputs.intraday_batch_delay || '45' }}"
         if [ -n "${{ github.event.inputs.intraday_min_rows }}" ]; then
           ARGS="$ARGS --min-rows ${{ github.event.inputs.intraday_min_rows }}"
         fi
