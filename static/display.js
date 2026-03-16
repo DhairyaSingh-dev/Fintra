@@ -3,6 +3,9 @@ import { STATE, formatPrice, formatNumber, getRsiColor, getRsiBackground, CONFIG
 import { renderChart, destroyExistingCharts } from './charts.js';
 
 export function displayData(data) {
+    // Destroy existing charts before rendering new ones
+    destroyExistingCharts();
+    
     const companyInfo = STATE.stockDatabase.find(s => s.symbol === data.ticker) || { name: 'Technical Analysis Data' };
     document.getElementById('output').innerHTML = `
         <div class="ticker-display">
@@ -44,6 +47,22 @@ export function displayData(data) {
         grid.appendChild(card);
     });
     document.getElementById('output').appendChild(grid);
+
+    // Reset chart tabs to default (OHLCV) when new data is loaded
+    const tabs = document.querySelectorAll('.chart-tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    const ohlcvTab = document.querySelector('.chart-tab[data-chart="ohlcv"]');
+    if (ohlcvTab) ohlcvTab.classList.add('active');
+    
+    document.querySelectorAll('.chart-container').forEach(c => {
+        c.classList.remove('active');
+        c.style.display = 'none';
+    });
+    const ohlcvContainer = document.getElementById('chart-ohlcv');
+    if (ohlcvContainer) {
+        ohlcvContainer.classList.add('active');
+        ohlcvContainer.style.display = 'block';
+    }
 
     // Add event listeners for chart tabs
     const tabs = document.querySelectorAll('.chart-tab');
