@@ -261,7 +261,7 @@ class TestFilterToWindow:
 class TestFetchIntradayData:
     """Tests for fetching intraday data."""
 
-    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv")
+    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv_async")
     def test_fetches_and_normalizes_data(self, mock_fetch, updater):
         """Test fetches and normalizes intraday data."""
         window_start = datetime.now() - timedelta(days=61)
@@ -284,7 +284,7 @@ class TestFetchIntradayData:
         assert result is not None
         assert "Open" in result.columns
 
-    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv")
+    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv_async")
     def test_returns_none_on_fetch_error(self, mock_fetch, updater):
         """Test returns None when fetch fails."""
         window_start = datetime.now() - timedelta(days=61)
@@ -296,7 +296,7 @@ class TestFetchIntradayData:
 
         assert result is None
 
-    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv")
+    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv_async")
     def test_returns_none_on_empty_response(self, mock_fetch, updater):
         """Test returns None when fetch returns None."""
         window_start = datetime.now() - timedelta(days=61)
@@ -312,7 +312,7 @@ class TestFetchIntradayData:
 class TestUpdateIntradayFile:
     """Tests for updating intraday files."""
 
-    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv")
+    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv_async")
     def test_updates_file_with_new_data(self, mock_fetch, updater, temp_intraday_dir):
         """Test updates parquet file with fetched data."""
         window_start = datetime.now() - timedelta(days=61)
@@ -338,7 +338,7 @@ class TestUpdateIntradayFile:
 
         assert result is True
 
-    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv")
+    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv_async")
     def test_returns_false_on_fetch_failure(self, mock_fetch, updater):
         """Test returns False when fetch fails."""
         window_start = datetime.now() - timedelta(days=61)
@@ -350,7 +350,7 @@ class TestUpdateIntradayFile:
 
         assert result is False
 
-    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv")
+    @patch("scripts.intraday_data_updater.fetch_intraday_ohlcv_async")
     def test_respects_min_rows_requirement(self, mock_fetch, updater):
         """Test respects minimum rows requirement."""
         window_start = datetime.now() - timedelta(days=61)

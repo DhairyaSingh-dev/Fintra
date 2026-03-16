@@ -1,9 +1,11 @@
+import asyncio
 import logging
 import random
 import requests
 import time
 import pandas as pd
 from datetime import datetime, timedelta
+from typing import Optional
 import yfinance as yf
 from backend.config import Config
 
@@ -451,8 +453,85 @@ def fetch_intraday_ohlcv(
 def _standardize_df(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure standard Index and Columns for yFinance DataFrame"""
     if getattr(df.index, "tz", None) is not None:
-        df.index = df.index.tz_localize(None)
+        df.index = df.index.tz_convert(None)
     df.columns = [col.lower().replace(" ", "_") for col in df.columns]
     df.columns = [col.title().replace("_", "") for col in df.columns]
     df.index.name = "Date"
     return df
+
+
+# ===== Async versions for faster parallel fetching =====
+
+
+async def _fetch_yfinance_chunk_async(
+    yf_symbol: str, chunk_start: datetime, chunk_end: datetime
+) -> Optional[pd.DataFrame]:
+    """Async helper to fetch a single chunk from yfinance."""
+    loop = asyncio.get_event_loop()
+    try:
+        ticker = yf.Ticker(yf_symbol)
+        df = await loop.run_in_executor(
+            None,
+            lambda: ticker.history(
+                interval="1m", start=chunk_start, end=chunk_end, auto_adjust=False
+            ),
+        )
+        if df is not None and not df.empty:
+            return _standardize_df(df)
+    except Exception as e:
+        logger.warning(f"[yFinance] Chunk error: {e}")
+    return None
+
+
+async def fetch_intraday_ohlcv_async(
+    symbol: str, start_dt: datetime, end_dt: datetime
+) -> Optional[pd.DataFrame]:
+    """Async version: Fetch 1-min OHLCV data with parallel chunk fetching.
+
+    Fetches all chunks in parallel for a single symbol.
+    """
+    is_nse = symbol.upper().endswith(".NS")
+    yf_symbol = symbol if is_nse else f"{symbol}.NS" if "." not in symbol else symbol
+
+    max_yf_date = datetime.now() - timedelta(days=30)
+    effective_start_dt = max(start_dt, max_yf_date)
+    effective_end_dt = datetime.now()
+
+    if effective_start_dt >= effective_end_dt:
+        logger.warning(
+            f"[yFinance] Requested range outside 30-day limit, skipping {symbol}"
+        )
+        return None
+
+    date_range_days = (effective_end_dt - effective_start_dt).days
+
+    if date_range_days > 5:
+        logger.info(
+            f"[yFinance] Async: fetching {yf_symbol} {effective_start_dt.date()} to {effective_end_dt.date()}"
+        )
+
+        tasks = []
+        for chunk_start, chunk_end in _date_range_chunks(
+            effective_start_dt, effective_end_dt, chunk_days=5
+        ):
+            task = _fetch_yfinance_chunk_async(yf_symbol, chunk_start, chunk_end)
+            tasks.append(task)
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        all_dfs = []
+        for i, result in enumerate(results):
+            if isinstance(result, pd.DataFrame) and not result.empty:
+                all_dfs.append(result)
+            elif isinstance(result, Exception):
+                logger.warning(f"[yFinance] Chunk {i} failed: {result}")
+
+        if all_dfs:
+            combined = pd.concat(all_dfs).sort_index()
+            logger.info(f"[yFinance] Async combined {len(combined)} rows from chunks")
+            return combined
+
+        logger.warning(f"[yFinance] No data from any chunk")
+        return None
+    else:
+        return fetch_intraday_ohlcv(symbol, effective_start_dt, effective_end_dt)

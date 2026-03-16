@@ -26,16 +26,19 @@ import os
 import shutil
 import sys
 import time as time_module
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, time
 from pathlib import Path
+from threading import Lock
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
+import asyncio
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.data_providers import fetch_intraday_ohlcv
+from backend.data_providers import fetch_intraday_ohlcv, fetch_intraday_ohlcv_async
 from backend.data_compliance import INTRADAY_DIRECTORY, get_intraday_parquet_path
 
 # Configure logging
@@ -61,14 +64,16 @@ class IntradayDataUpdater:
     Manages SEBI-compliant intraday data updates with sliding window.
     """
 
-    def __init__(self, intraday_dir: Path = None):
+    def __init__(self, intraday_dir: Path = None, max_workers: int = 20):
         self.intraday_dir = (
             Path(intraday_dir) if intraday_dir else Path(INTRADAY_DIRECTORY)
         )
+        self.max_workers = max_workers
         self.updated_stocks: List[Dict] = []
         self.skipped_stocks: List[Dict] = []
         self.deleted_files: List[Dict] = []
         self.errors: List[Dict] = []
+        self._lock = Lock()
 
     def get_window_dates(self) -> Tuple[datetime, datetime]:
         """
@@ -248,14 +253,16 @@ class IntradayDataUpdater:
         try:
             logger.info(f"Fetching intraday data for {symbol}")
 
-            df = fetch_intraday_ohlcv(symbol, window_start, window_end)
+            # Use async version for faster parallel chunk fetching
+            df = asyncio.run(
+                fetch_intraday_ohlcv_async(symbol, window_start, window_end)
+            )
 
             if df is None or df.empty:
                 logger.warning(f"No intraday data returned for {symbol}")
                 return None
 
             df = self.normalize_dataframe(df)
-            df = self.filter_to_window(df, window_start, window_end)
 
             if df.empty:
                 logger.warning(f"No data in window for {symbol}")
@@ -425,32 +432,47 @@ class IntradayDataUpdater:
             logger.error("No symbols found to process")
             return {"success": False, "error": "No symbols found"}
 
-        logger.info(f"Processing {len(symbols)} symbols")
+        logger.info(
+            f"Processing {len(symbols)} symbols with {self.max_workers} workers"
+        )
         logger.info("-" * 60)
 
-        # Process each symbol
+        # Process each symbol with thread pool
         attempted = 0
         succeeded = 0
         skipped = 0
         failed = 0
 
-        for symbol in symbols:
-            attempted += 1
-
+        def process_symbol(symbol: str) -> Tuple[str, bool]:
+            """Thread-safe function to update a symbol."""
             success = self.update_intraday_file(
                 symbol, window_start, window_end, min_rows
             )
+            with self._lock:
+                if success:
+                    self.updated_stocks.append({"symbol": symbol})
+                else:
+                    self.skipped_stocks.append({"symbol": symbol})
+            return symbol, success
 
-            if success:
-                succeeded += 1
-                self.updated_stocks.append({"symbol": symbol})
-            else:
-                failed += 1
-                self.skipped_stocks.append({"symbol": symbol})
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {executor.submit(process_symbol, sym): sym for sym in symbols}
 
-            # Sleep to avoid rate limits
-            if sleep_seconds > 0 and attempted < len(symbols):
-                time_module.sleep(sleep_seconds)
+            for i, future in enumerate(as_completed(futures), 1):
+                symbol = futures[future]
+                attempted += 1
+                try:
+                    _, success = future.result()
+                    if success:
+                        succeeded += 1
+                    else:
+                        failed += 1
+                except Exception as e:
+                    logger.error(f"Error processing {symbol}: {e}")
+                    failed += 1
+
+                if i % 10 == 0:
+                    logger.info(f"Progress: {i}/{len(symbols)} processed")
 
         # Validate files if requested
         validation_results = []
@@ -533,10 +555,10 @@ def main():
         "--min-rows", type=int, default=0, help="Minimum rows required to save file"
     )
     parser.add_argument(
-        "--sleep-seconds",
-        type=float,
-        default=1.0,
-        help="Sleep between fetches (default: 1.0)",
+        "--max-workers",
+        type=int,
+        default=20,
+        help="Number of parallel workers (default: 20)",
     )
     parser.add_argument(
         "--no-prune", action="store_true", help="Disable pruning of old data"
@@ -555,14 +577,15 @@ def main():
 
     # Create updater
     intraday_dir = Path(args.intraday_dir) if args.intraday_dir else None
-    updater = IntradayDataUpdater(intraday_dir=intraday_dir)
+    updater = IntradayDataUpdater(
+        intraday_dir=intraday_dir, max_workers=args.max_workers
+    )
 
     # Run update
     report = updater.run_update(
         symbols=args.symbols,
         max_symbols=args.max_symbols,
         min_rows=args.min_rows,
-        sleep_seconds=args.sleep_seconds,
         prune_old=not args.no_prune,
         validate=not args.no_validate,
     )
