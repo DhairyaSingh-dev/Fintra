@@ -594,6 +594,16 @@ h1, h2, h3, .hero-headline {
   margin-top: 12px;
 }
 
+.demo-result .data-disclaimer {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+}
+
 /* Login CTA in demo */
 .demo-login-section {
   margin-top: 20px;
