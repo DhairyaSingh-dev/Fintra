@@ -204,6 +204,17 @@ def fetch_daily_ohlcv(
     return None
 
 
+def _date_range_chunks(start_dt: datetime, end_dt: datetime, chunk_days: int = 7):
+    """Yield (start, end) tuples for date ranges, each chunk_days apart."""
+    current = start_dt
+    while current < end_dt:
+        chunk_end = current + timedelta(days=chunk_days)
+        if chunk_end > end_dt:
+            chunk_end = end_dt
+        yield current, chunk_end
+        current = chunk_end
+
+
 def fetch_intraday_ohlcv(
     symbol: str, start_dt: datetime, end_dt: datetime
 ) -> pd.DataFrame:
@@ -211,43 +222,129 @@ def fetch_intraday_ohlcv(
 
     For NSE stocks (.NS): only yfinance works (Polygon/AV don't carry NSE intraday on free tier).
     For US stocks: yfinance -> Polygon -> AlphaVantage.
+
+    Note: yfinance limits 1-min data to ~30 days per request, so we chunk requests.
     """
     is_nse = symbol.upper().endswith(".NS")
     yf_symbol = symbol if is_nse else f"{symbol}.NS" if "." not in symbol else symbol
     base_symbol = symbol.replace(".NS", "").replace(".BO", "")
 
-    # Try 1: yFinance (with retry + longer cooldown)
+    # yfinance only has last 30 days of 1-min data
+    # We fetch what we can (last 30 days to now) and let the storage maintain the sliding window
+    max_yf_date = datetime.now() - timedelta(days=30)
+
+    # Fetch from the later of (start_dt or 30 days ago) up to now
+    effective_start_dt = max(start_dt, max_yf_date)
+    effective_end_dt = datetime.now()
+
+    # If the effective range is inverted (requested data too old), return empty
+    if effective_start_dt >= effective_end_dt:
+        logger.warning(
+            f"[yFinance] Requested range outside 30-day limit, skipping {symbol}"
+        )
+        return None
+
+    logger.info(
+        f"[yFinance] Fetching available data from last 30 days: "
+        f"{effective_start_dt.date()} to {effective_end_dt.date()}"
+    )
+
+    # Try 1: yFinance (with retry + longer cooldown + chunking for >7 days)
     max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            logger.info(
-                f"[yFinance] Fetching 1-min data for {yf_symbol} (attempt {attempt + 1}/{max_retries})"
-            )
-            ticker = yf.Ticker(yf_symbol, session=_yf_session())
-            df = ticker.history(
-                interval="1m", start=start_dt, end=end_dt, auto_adjust=False
-            )
-            if df is not None and not df.empty:
-                logger.info(f"[yFinance] Success: {len(df)} rows")
-                return _standardize_df(df)
-            logger.warning(f"[yFinance] Returned empty dataframe for {yf_symbol}")
-            break  # empty df, break to fallback
-        except Exception as e:
-            err_str = str(e).lower()
-            logger.warning(f"[yFinance] Error on attempt {attempt + 1}: {e}")
-            is_rate_limit = any(
-                kw in err_str
-                for kw in ["rate", "too many", "429", "timeout", "timed out"]
-            )
-            if is_rate_limit and attempt < max_retries - 1:
-                wait = 5 * (attempt + 1)  # 5s, 10s, 15s — longer cooldown
-                logger.warning(f"[yFinance] Possible rate limit, waiting {wait}s...")
-                time.sleep(wait)
-            elif is_rate_limit and attempt == max_retries - 1:
-                logger.warning("[yFinance] Rate limits exhausted after all retries")
-            else:
-                logger.warning(f"[yFinance] Non-retryable error: {e}")
-                break
+    date_range_days = (effective_end_dt - effective_start_dt).days
+
+    # If range > 7 days, we need to chunk the requests
+    if date_range_days > 7:
+        logger.info(
+            f"[yFinance] Date range {date_range_days} days > 7, chunking requests..."
+        )
+        all_dfs = []
+        for chunk_start, chunk_end in _date_range_chunks(
+            effective_start_dt, effective_end_dt, chunk_days=7
+        ):
+            for attempt in range(max_retries):
+                try:
+                    logger.info(
+                        f"[yFinance] Fetching {yf_symbol} {chunk_start.date()} to {chunk_end.date()} "
+                        f"(attempt {attempt + 1}/{max_retries})"
+                    )
+                    ticker = yf.Ticker(yf_symbol, session=_yf_session())
+                    df = ticker.history(
+                        interval="1m",
+                        start=chunk_start,
+                        end=chunk_end,
+                        auto_adjust=False,
+                    )
+                    if df is not None and not df.empty:
+                        logger.info(f"[yFinance] Chunk success: {len(df)} rows")
+                        all_dfs.append(_standardize_df(df))
+                        break
+                    else:
+                        logger.warning(
+                            f"[yFinance] Empty result for chunk {chunk_start.date()}"
+                        )
+                        break
+                except Exception as e:
+                    err_str = str(e).lower()
+                    logger.warning(f"[yFinance] Chunk error attempt {attempt + 1}: {e}")
+                    is_rate_limit = any(
+                        kw in err_str
+                        for kw in ["rate", "too many", "429", "timeout", "timed out"]
+                    )
+                    if is_rate_limit and attempt < max_retries - 1:
+                        wait = 5 * (attempt + 1)
+                        logger.warning(f"[yFinance] Rate limit, waiting {wait}s...")
+                        time.sleep(wait)
+                    elif attempt == max_retries - 1:
+                        logger.warning(f"[yFinance] All retries exhausted for chunk")
+
+            # Small delay between chunks to avoid rate limits
+            time.sleep(1)
+
+        if all_dfs:
+            combined = pd.concat(all_dfs).sort_index()
+            # Don't filter by SEBI window - return all fetched data
+            # The storage layer will handle the sliding window
+            logger.info(f"[yFinance] Combined {len(combined)} rows from chunks")
+            return combined
+        logger.warning(f"[yFinance] No data from any chunk")
+    else:
+        # Original single-request logic for short ranges
+        for attempt in range(max_retries):
+            try:
+                logger.info(
+                    f"[yFinance] Fetching 1-min data for {yf_symbol} (attempt {attempt + 1}/{max_retries})"
+                )
+                ticker = yf.Ticker(yf_symbol, session=_yf_session())
+                df = ticker.history(
+                    interval="1m",
+                    start=effective_start_dt,
+                    end=effective_end_dt,
+                    auto_adjust=False,
+                )
+                if df is not None and not df.empty:
+                    logger.info(f"[yFinance] Success: {len(df)} rows")
+                    return _standardize_df(df)
+                logger.warning(f"[yFinance] Returned empty dataframe for {yf_symbol}")
+                break  # empty df, break to fallback
+            except Exception as e:
+                err_str = str(e).lower()
+                logger.warning(f"[yFinance] Error on attempt {attempt + 1}: {e}")
+                is_rate_limit = any(
+                    kw in err_str
+                    for kw in ["rate", "too many", "429", "timeout", "timed out"]
+                )
+                if is_rate_limit and attempt < max_retries - 1:
+                    wait = 5 * (attempt + 1)  # 5s, 10s, 15s — longer cooldown
+                    logger.warning(
+                        f"[yFinance] Possible rate limit, waiting {wait}s..."
+                    )
+                    time.sleep(wait)
+                elif is_rate_limit and attempt == max_retries - 1:
+                    logger.warning("[yFinance] Rate limits exhausted after all retries")
+                else:
+                    logger.warning(f"[yFinance] Non-retryable error: {e}")
+                    break
 
     # For NSE stocks, external providers don't carry Indian intraday data on free tiers
     if is_nse:

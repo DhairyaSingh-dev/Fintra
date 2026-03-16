@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-03-16T06:55:52.367952",
+  "timestamp": "2026-03-16T09:49:56.800422",
   "pipeline": "intraday",
-  "window_start": "2026-01-14T00:00:00",
-  "window_end": "2026-02-13T23:59:59",
+  "window_start": "2026-02-14T00:00:00",
+  "window_end": "2026-03-16T09:49:56.799423",
   "window_days": 31,
   "total_symbols": 1,
   "attempted": 1,
