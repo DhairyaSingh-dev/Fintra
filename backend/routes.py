@@ -1294,45 +1294,46 @@ def demo_search():
     try:
         logger.info(f"Demo search: fetching data for {symbol}")
 
-        # Use direct yfinance for demo (more reliable)
-        import yfinance as yf
+        # Try local data first (same as authenticated endpoints)
+        df, compliance_info = load_stock_data(symbol, apply_lag=True)
 
-        ticker = yf.Ticker(f"{symbol}.NS")
-        hist = ticker.history(period="90d", interval="1d")
-
-        logger.info(
-            f"Demo search: raw yfinance data for {symbol}: {len(hist) if hist is not None else 0} rows"
-        )
-
-        if hist is None or hist.empty:
-            # Try without .NS suffix
-            ticker2 = yf.Ticker(symbol)
-            hist = ticker2.history(period="90d", interval="1d")
+        if df is None or df.empty:
+            # Fallback: try yfinance directly for demo
             logger.info(
-                f"Demo search: fallback yfinance data for {symbol}: {len(hist) if hist is not None else 0} rows"
+                f"Demo search: local data not found, trying yfinance for {symbol}"
             )
+            try:
+                import yfinance as yf
 
-        if hist is None or hist.empty:
+                ticker = yf.Ticker(f"{symbol}.NS")
+                hist = ticker.history(period="90d", interval="1d")
+                if hist is not None and not hist.empty:
+                    # Apply SEBI lag
+                    lag_date = datetime.now() - timedelta(days=31)
+                    hist = hist[hist.index <= lag_date]
+                    df = hist
+                    logger.info(
+                        f"Demo search: yfinance returned {len(df)} rows for {symbol}"
+                    )
+                else:
+                    logger.warning(f"Demo search: no data from yfinance for {symbol}")
+                    return jsonify(error=f"No data found for {symbol}"), 404
+            except Exception as yf_err:
+                logger.error(f"Demo search: yfinance error for {symbol}: {yf_err}")
+                return jsonify(error=f"No data found for {symbol}"), 404
+
+        if df is None or df.empty:
             logger.warning(f"Demo search: no data for {symbol}")
             return jsonify(error=f"No data found for {symbol}"), 404
 
-        # Apply SEBI lag
-        lag_date = datetime.now() - timedelta(days=31)
-        hist = hist[hist.index <= lag_date]
-
-        if hist.empty:
-            return jsonify(
-                error=f"No recent data available for {symbol} (SEBI 31-day lag)"
-            ), 404
-
         # Calculate indicators
-        hist["RSI"] = compute_rsi(hist["Close"])
-        hist["MA5"] = hist["Close"].rolling(window=5).mean()
-        hist["MA10"] = hist["Close"].rolling(window=10).mean()
-        hist["MACD"], hist["Signal"], hist["Histogram"] = compute_macd(hist["Close"])
+        df["RSI"] = compute_rsi(df["Close"])
+        df["MA5"] = df["Close"].rolling(window=5).mean()
+        df["MA10"] = df["Close"].rolling(window=10).mean()
+        df["MACD"], df["Signal"], df["Histogram"] = compute_macd(df["Close"])
 
         # Get latest data
-        latest = hist.iloc[-1]
+        latest = df.iloc[-1]
 
         # Format response
         price = float(latest["Close"])
