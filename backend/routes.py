@@ -1285,28 +1285,19 @@ def demo_search():
         return jsonify(error="Invalid symbol format"), 400
 
     try:
-        # Try to fetch data using yfinance
-        import yfinance as yf
-
-        ticker = yf.Ticker(f"{symbol}.NS")
-        hist = ticker.history(period="90d", interval="1d")
-
-        if hist is None or hist.empty:
-            # Try BSE
-            hist = ticker.history(period="90d", interval="1d")
+        # Use existing fetch function (same as authenticated endpoints)
+        hist = fetch_from_yfinance(symbol, period="90d", interval="1d")
 
         if hist is None or hist.empty:
             return jsonify(error=f"No data found for {symbol}"), 404
 
-        # Apply SEBI lag (31 days)
-        from datetime import timedelta
-
+        # Apply SEBI lag
         lag_date = datetime.now() - timedelta(days=31)
         hist = hist[hist.index <= lag_date]
 
         if hist.empty:
             return jsonify(
-                error=f"No recent data available for {symbol} (SEBI 31-day lag applied)"
+                error=f"No recent data available for {symbol} (SEBI 31-day lag)"
             ), 404
 
         # Calculate indicators
@@ -1314,7 +1305,6 @@ def demo_search():
         hist["MA5"] = hist["Close"].rolling(window=5).mean()
         hist["MA10"] = hist["Close"].rolling(window=10).mean()
         hist["MACD"], hist["Signal"], hist["Histogram"] = compute_macd(hist["Close"])
-        hist["ATR"] = hist["High"] - hist["Low"]
 
         # Get latest data
         latest = hist.iloc[-1]
@@ -1324,7 +1314,7 @@ def demo_search():
         change = float(latest["Close"] - latest["Open"])
         change_percent = (change / latest["Open"]) * 100
 
-        # Generate simple analysis based on indicators
+        # Generate simple analysis
         rsi = latest.get("RSI")
         macd = latest.get("MACD")
         signal = latest.get("Signal")
@@ -1357,7 +1347,7 @@ def demo_search():
 
         return jsonify(
             symbol=symbol,
-            name=ticker.info.get("longName", f"{symbol} Ltd"),
+            name=f"{symbol} Ltd",
             price=f"₹{price:.2f}",
             change=f"{'+' if change >= 0 else ''}{change:.2f}",
             change_percent=f"{'+' if change_percent >= 0 else ''}{change_percent:.2f}%",
@@ -1367,12 +1357,9 @@ def demo_search():
             analysis=analysis,
             data_date=latest.index.strftime("%Y-%m-%d"),
             is_preview=True,
-            notice="This is a preview with 31-day SEBI lag. Sign in for real-time data and full analysis.",
+            notice="Preview with 31-day SEBI lag",
         ), 200
 
-    except ImportError:
-        logger.error("yfinance not available for demo search")
-        return jsonify(error="Demo temporarily unavailable"), 503
     except Exception as e:
         logger.error(f"Demo search error for {symbol}: {e}")
         return jsonify(error=f"Unable to fetch data for {symbol}"), 500
