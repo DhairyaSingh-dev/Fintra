@@ -1269,8 +1269,15 @@ def get_current_price_endpoint(symbol):
 
 
 # ==================== DEMO SEARCH ROUTES ====================
+@api.route("/demo/ping", methods=["GET"])
+def demo_ping():
+    """Test endpoint to verify demo routes are working"""
+    return jsonify(status="ok", message="Demo routes loaded"), 200
+
+
 @api.route("/demo/search", methods=["GET"])
 def demo_search():
+    logger.info(f"Demo search endpoint called with args: {request.args}")
     """
     Demo stock search endpoint - no authentication required.
     Returns basic stock data with technical indicators for preview.
@@ -1285,10 +1292,12 @@ def demo_search():
         return jsonify(error="Invalid symbol format"), 400
 
     try:
+        logger.info(f"Demo search: fetching data for {symbol}")
         # Use existing fetch function (same as authenticated endpoints)
         hist = fetch_from_yfinance(symbol, period="90d", interval="1d")
 
         if hist is None or hist.empty:
+            logger.warning(f"Demo search: no data for {symbol}")
             return jsonify(error=f"No data found for {symbol}"), 404
 
         # Apply SEBI lag
@@ -1345,6 +1354,7 @@ def demo_search():
             else "Market data analysis in progress."
         )
 
+        logger.info(f"Demo search: returning data for {symbol}")
         return jsonify(
             symbol=symbol,
             name=f"{symbol} Ltd",
