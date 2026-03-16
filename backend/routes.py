@@ -1268,6 +1268,152 @@ def get_current_price_endpoint(symbol):
         return jsonify(error="Server error"), 500
 
 
+# ==================== DEMO SEARCH ROUTES ====================
+@api.route("/demo/search", methods=["GET"])
+def demo_search():
+    """
+    Demo stock search endpoint - no authentication required.
+    Returns basic stock data with technical indicators for preview.
+    """
+    symbol = request.args.get("symbol", "").strip().upper()
+
+    if not symbol:
+        return jsonify(error="Symbol is required"), 400
+
+    # Validate symbol format
+    if not re.match(r"^[A-Z]{2,10}$", symbol):
+        return jsonify(error="Invalid symbol format"), 400
+
+    try:
+        # Try to fetch data using yfinance
+        import yfinance as yf
+
+        ticker = yf.Ticker(f"{symbol}.NS")
+        hist = ticker.history(period="90d", interval="1d")
+
+        if hist is None or hist.empty:
+            # Try BSE
+            hist = ticker.history(period="90d", interval="1d")
+
+        if hist is None or hist.empty:
+            return jsonify(error=f"No data found for {symbol}"), 404
+
+        # Apply SEBI lag (31 days)
+        from datetime import timedelta
+
+        lag_date = datetime.now() - timedelta(days=31)
+        hist = hist[hist.index <= lag_date]
+
+        if hist.empty:
+            return jsonify(
+                error=f"No recent data available for {symbol} (SEBI 31-day lag applied)"
+            ), 404
+
+        # Calculate indicators
+        hist["RSI"] = compute_rsi(hist["Close"])
+        hist["MA5"] = hist["Close"].rolling(window=5).mean()
+        hist["MA10"] = hist["Close"].rolling(window=10).mean()
+        hist["MACD"], hist["Signal"], hist["Histogram"] = compute_macd(hist["Close"])
+        hist["ATR"] = hist["High"] - hist["Low"]
+
+        # Get latest data
+        latest = hist.iloc[-1]
+
+        # Format response
+        price = float(latest["Close"])
+        change = float(latest["Close"] - latest["Open"])
+        change_percent = (change / latest["Open"]) * 100
+
+        # Generate simple analysis based on indicators
+        rsi = latest.get("RSI")
+        macd = latest.get("MACD")
+        signal = latest.get("Signal")
+
+        analysis_parts = []
+
+        if rsi:
+            if rsi < 30:
+                analysis_parts.append(
+                    f"RSI at {rsi:.1f} indicates oversold conditions."
+                )
+            elif rsi > 70:
+                analysis_parts.append(
+                    f"RSI at {rsi:.1f} suggests overbought territory."
+                )
+            else:
+                analysis_parts.append(f"RSI at {rsi:.1f} shows neutral momentum.")
+
+        if macd and signal:
+            if macd > signal:
+                analysis_parts.append("MACD shows bullish crossover.")
+            else:
+                analysis_parts.append("MACD indicates bearish momentum.")
+
+        analysis = (
+            " ".join(analysis_parts)
+            if analysis_parts
+            else "Market data analysis in progress."
+        )
+
+        return jsonify(
+            symbol=symbol,
+            name=ticker.info.get("longName", f"{symbol} Ltd"),
+            price=f"₹{price:.2f}",
+            change=f"{'+' if change >= 0 else ''}{change:.2f}",
+            change_percent=f"{'+' if change_percent >= 0 else ''}{change_percent:.2f}%",
+            rsi=round(rsi, 2) if rsi and not pd.isna(rsi) else None,
+            macd=round(macd, 2) if macd and not pd.isna(macd) else None,
+            signal=round(signal, 2) if signal and not pd.isna(signal) else None,
+            analysis=analysis,
+            data_date=latest.index.strftime("%Y-%m-%d"),
+            is_preview=True,
+            notice="This is a preview with 31-day SEBI lag. Sign in for real-time data and full analysis.",
+        ), 200
+
+    except ImportError:
+        logger.error("yfinance not available for demo search")
+        return jsonify(error="Demo temporarily unavailable"), 503
+    except Exception as e:
+        logger.error(f"Demo search error for {symbol}: {e}")
+        return jsonify(error=f"Unable to fetch data for {symbol}"), 500
+
+
+@api.route("/demo/stocks", methods=["GET"])
+def demo_stocks_list():
+    """
+    Returns list of available stocks for demo search autocomplete.
+    """
+    # Common Indian stocks
+    stocks = [
+        {"symbol": "RELIANCE", "name": "Reliance Industries Ltd"},
+        {"symbol": "TCS", "name": "Tata Consultancy Services Ltd"},
+        {"symbol": "INFY", "name": "Infosys Ltd"},
+        {"symbol": "HDFCBANK", "name": "HDFC Bank Ltd"},
+        {"symbol": "ICICIBANK", "name": "ICICI Bank Ltd"},
+        {"symbol": "SBIN", "name": "State Bank of India"},
+        {"symbol": "BHARTIARTL", "name": "Bharti Airtel Ltd"},
+        {"symbol": "WIPRO", "name": "Wipro Ltd"},
+        {"symbol": "HCLTECH", "name": "HCL Technologies Ltd"},
+        {"symbol": "LT", "name": "Larsen & Toubro Ltd"},
+        {"symbol": "SUNPHARMA", "name": "Sun Pharmaceutical Industries Ltd"},
+        {"symbol": "TITAN", "name": "Titan Company Ltd"},
+        {"symbol": "BAJFINANCE", "name": "Bajaj Finance Ltd"},
+        {"symbol": "MARUTI", "name": "Maruti Suzuki India Ltd"},
+        {"symbol": "TATAMOTORS", "name": "Tata Motors Ltd"},
+        {"symbol": "ADANIPORTS", "name": "Adani Ports and SEZ Ltd"},
+        {"symbol": "AXISBANK", "name": "Axis Bank Ltd"},
+        {"symbol": "KOTAKBANK", "name": "Kotak Mahindra Bank Ltd"},
+        {"symbol": "HINDUNILVR", "name": "Hindustan Unilever Ltd"},
+        {"symbol": "NTPC", "name": "NTPC Ltd"},
+        {"symbol": "POWERGRID", "name": "Power Grid Corporation of India Ltd"},
+        {"symbol": "ONGC", "name": "Oil & Natural Gas Corporation Ltd"},
+        {"symbol": "COALINDIA", "name": "Coal India Ltd"},
+        {"symbol": "ITC", "name": "ITC Ltd"},
+        {"symbol": "DRREDDY", "name": "Dr. Reddy's Laboratories Ltd"},
+    ]
+    return jsonify(stocks=stocks), 200
+
+
 # ==================== PORTFOLIO ROUTES ====================
 @api.route("/portfolio", methods=["GET"])
 def get_portfolio():

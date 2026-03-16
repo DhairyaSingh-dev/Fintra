@@ -297,43 +297,59 @@ async function showDemoResult(symbol) {
   const loadingEl = document.getElementById('demo-loading');
   const contentEl = document.getElementById('demo-content');
   
-  const stock = DEMO_STOCKS.find(s => s.symbol === symbol) || { symbol, name: symbol + '.NS' };
+  const stock = DEMO_STOCKS.find(s => s.symbol === symbol) || { symbol, name: symbol + ' Ltd' };
   
   demoResult.classList.add('active');
   if (loadingEl) loadingEl.style.display = 'flex';
   if (contentEl) contentEl.style.display = 'none';
   
-  const stockData = await fetchStockData(symbol);
-  
-  if (loadingEl) loadingEl.style.display = 'none';
-  if (contentEl) contentEl.style.display = 'block';
-  
-  if (!stockData) {
+  try {
+    // Use the new demo API endpoint
+    const response = await fetch(`/api/demo/search?symbol=${encodeURIComponent(symbol)}`);
+    const data = await response.json();
+    
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (contentEl) contentEl.style.display = 'block';
+    
+    if (data.error) {
+      document.getElementById('demo-symbol').textContent = stock.symbol;
+      document.getElementById('demo-name').textContent = data.error;
+      document.getElementById('demo-price').textContent = '--';
+      document.getElementById('demo-change').textContent = 'Unable to fetch data';
+      document.getElementById('demo-analysis').textContent = 'Please try again later or sign in for full access.';
+      return;
+    }
+    
+    document.getElementById('demo-symbol').textContent = data.symbol;
+    document.getElementById('demo-name').textContent = data.name;
+    document.getElementById('demo-price').textContent = data.price;
+    document.getElementById('demo-change').textContent = data.change_percent;
+    
+    const priceEl = document.getElementById('demo-price');
+    const changeEl = document.getElementById('demo-change');
+    
+    if (data.change_percent.startsWith('+')) {
+      priceEl.className = 'stock-price';
+      changeEl.className = 'stock-change';
+    } else {
+      priceEl.className = 'stock-price negative';
+      changeEl.className = 'stock-change negative';
+    }
+
+    document.getElementById('demo-analysis').textContent = data.analysis;
+    
+  } catch (error) {
+    console.error('Error fetching demo data:', error);
+    
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (contentEl) contentEl.style.display = 'block';
+    
     document.getElementById('demo-symbol').textContent = stock.symbol;
-    document.getElementById('demo-name').textContent = 'Data unavailable';
+    document.getElementById('demo-name').textContent = 'Connection error';
     document.getElementById('demo-price').textContent = '--';
     document.getElementById('demo-change').textContent = 'Unable to fetch data';
     document.getElementById('demo-analysis').textContent = 'Please try again later or sign in for full access.';
-    return;
   }
-  
-  document.getElementById('demo-symbol').textContent = stockData.symbol;
-  document.getElementById('demo-name').textContent = stock.name;
-  document.getElementById('demo-price').textContent = '₹' + stockData.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  document.getElementById('demo-change').textContent = (stockData.change >= 0 ? '+' : '') + stockData.changePercent.toFixed(2) + '%';
-  
-  const priceEl = document.getElementById('demo-price');
-  const changeEl = document.getElementById('demo-change');
-  
-  if (stockData.positive) {
-    priceEl.className = 'stock-price';
-    changeEl.className = 'stock-change';
-  } else {
-    priceEl.className = 'stock-price negative';
-    changeEl.className = 'stock-change negative';
-  }
-
-  document.getElementById('demo-analysis').textContent = generateAIAnalysis(stockData);
 }
 
 function initSmoothScroll() {
@@ -350,21 +366,19 @@ function initSmoothScroll() {
 
 function initLoginButtons() {
   const headerLoginBtn = document.getElementById('header-login-btn');
-  const heroLoginBtn = document.getElementById('hero-login-btn');
-  const demoLoginCta = document.getElementById('demo-login-cta');
-  const loginCard = document.querySelector('.glass-card');
+  const demoLoginBtn = document.getElementById('demo-login-btn');
 
   const scrollToLogin = () => {
-    if (loginCard) {
-      loginCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const demoResult = document.getElementById('demo-result');
+    if (demoResult) {
+      demoResult.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
   if (headerLoginBtn) headerLoginBtn.addEventListener('click', scrollToLogin);
-  if (heroLoginBtn) heroLoginBtn.addEventListener('click', scrollToLogin);
-  if (demoLoginCta) {
+  if (demoLoginBtn) {
     import('./auth.js').then(module => {
-      demoLoginCta.addEventListener('click', module.handleGoogleLogin);
+      demoLoginBtn.addEventListener('click', module.handleGoogleLogin);
     });
   }
 }
