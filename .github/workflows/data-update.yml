@@ -33,6 +33,9 @@ on:
         required: false
         default: '0'
 
+permissions:
+  contents: write
+
 jobs:
   update-daily-data:
     runs-on: ubuntu-latest

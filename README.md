@@ -6,8 +6,8 @@
 [![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-2.0+-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com)
 [![Groq AI](https://img.shields.io/badge/Groq%20AI-Llama%203.3%2F70B-FF6B6B?style=for-the-badge)](https://groq.com)
-[![Tests](https://img.shields.io/github/actions/workflow/status/AvgPygameEnjoyer/fintra/test.yml?branch=main&label=Tests&style=for-the-badge)](https://github.com/AvgPygameEnjoyer/fintra/actions/workflows/test.yml)
-[![Data Pipeline](https://img.shields.io/github/actions/workflow/status/AvgPygameEnjoyer/fintra/data-update.yml?branch=main&label=Data%20Pipeline&style=for-the-badge)](https://github.com/AvgPygameEnjoyer/fintra/actions/workflows/data-update.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/DhairyaSingh-dev/fintra/test.yml?branch=main&label=Tests&style=for-the-badge)](https://github.com/DhairyaSingh-dev/fintra/actions/workflows/test.yml)
+[![Data Pipeline](https://img.shields.io/github/actions/workflow/status/DhairyaSingh-dev/fintra/data-update.yml?branch=main&label=Data%20Pipeline&style=for-the-badge)](https://github.com/DhairyaSingh-dev/fintra/actions/workflows/data-update.yml)
 
 > **Production-grade quantitative analysis platform** combining real-time market data, AI-driven insights, and institutional-level backtesting with Monte Carlo validation. Engineered for **sub-second latency** with WebAssembly-powered client-side computation.
 
@@ -696,7 +696,7 @@ SQLALCHEMY_ENGINE_OPTIONS = {
 
 ```bash
 # Clone repository
-git clone https://github.com/AvgPygameEnjoyer/fintra.git
+git clone https://github.com/DhairyaSingh-dev/fintra.git
 cd fintra
 
 # Create virtual environment
@@ -724,7 +724,7 @@ Visit `http://localhost:5000`
 
 ```bash
 # Clone and start with Docker Compose
-git clone https://github.com/AvgPygameEnjoyer/fintra.git
+git clone https://github.com/DhairyaSingh-dev/fintra.git
 cd fintra
 cp .env.template .env
 docker-compose up -d
@@ -898,7 +898,7 @@ Contributions are welcome! Please:
 ## 📧 Support
 
 For issues, questions, or feedback:
-- **GitHub Issues**: [github.com/AvgPygameEnjoyer/fintra/issues](https://github.com/AvgPygameEnjoyer/fintra/issues)
+- **GitHub Issues**: [github.com/DhairyaSingh-dev/fintra/issues](https://github.com/DhairyaSingh-dev/fintra/issues)
 - **Live Demo**: [fintraio.vercel.app](https://fintraio.vercel.app)
 
 ---
