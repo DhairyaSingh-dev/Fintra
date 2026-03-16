@@ -1383,6 +1383,16 @@ def demo_search():
         )
 
         logger.info(f"Demo search: returning data for {symbol}")
+
+        # Handle date formatting safely
+        try:
+            if hasattr(latest.index, "strftime"):
+                data_date = latest.index.strftime("%Y-%m-%d")
+            else:
+                data_date = str(latest.name)[:10] if latest.name else None
+        except Exception:
+            data_date = None
+
         return jsonify(
             symbol=symbol,
             name=f"{symbol} Ltd",
@@ -1393,7 +1403,7 @@ def demo_search():
             macd=round(macd, 2) if macd and not pd.isna(macd) else None,
             signal=round(signal, 2) if signal and not pd.isna(signal) else None,
             analysis=analysis,
-            data_date=latest.index.strftime("%Y-%m-%d"),
+            data_date=data_date,
             is_preview=True,
             notice="Preview with 31-day SEBI lag",
         ), 200
