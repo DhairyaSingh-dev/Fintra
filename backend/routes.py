@@ -1293,8 +1293,24 @@ def demo_search():
 
     try:
         logger.info(f"Demo search: fetching data for {symbol}")
-        # Use existing fetch function (same as authenticated endpoints)
-        hist = fetch_from_yfinance(symbol, period="90d", interval="1d")
+
+        # Use direct yfinance for demo (more reliable)
+        import yfinance as yf
+
+        ticker = yf.Ticker(f"{symbol}.NS")
+        hist = ticker.history(period="90d", interval="1d")
+
+        logger.info(
+            f"Demo search: raw yfinance data for {symbol}: {len(hist) if hist is not None else 0} rows"
+        )
+
+        if hist is None or hist.empty:
+            # Try without .NS suffix
+            ticker2 = yf.Ticker(symbol)
+            hist = ticker2.history(period="90d", interval="1d")
+            logger.info(
+                f"Demo search: fallback yfinance data for {symbol}: {len(hist) if hist is not None else 0} rows"
+            )
 
         if hist is None or hist.empty:
             logger.warning(f"Demo search: no data for {symbol}")

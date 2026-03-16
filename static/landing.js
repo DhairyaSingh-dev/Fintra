@@ -306,6 +306,12 @@ async function showDemoResult(symbol) {
   try {
     // Use the new demo API endpoint
     const response = await fetch(`/api/demo/search?symbol=${encodeURIComponent(symbol)}`);
+    console.log('Demo search response:', response.status, response.statusText);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const data = await response.json();
     
     if (loadingEl) loadingEl.style.display = 'none';
