@@ -572,6 +572,18 @@ def main():
         default=None,
         help="Override intraday data directory",
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=200,
+        help="Number of symbols per batch (default: 200)",
+    )
+    parser.add_argument(
+        "--batch-delay",
+        type=int,
+        default=45,
+        help="Seconds to wait between batches (default: 45)",
+    )
 
     args = parser.parse_args()
 
@@ -581,19 +593,70 @@ def main():
         intraday_dir=intraday_dir, max_workers=args.max_workers
     )
 
-    # Run update
-    report = updater.run_update(
-        symbols=args.symbols,
-        max_symbols=args.max_symbols,
-        min_rows=args.min_rows,
-        prune_old=not args.no_prune,
-        validate=not args.no_validate,
-    )
+    # Get list of symbols to process
+    if args.symbols:
+        all_symbols = args.symbols
+    else:
+        all_symbols = updater.get_symbols_from_daily_data()
+
+    if args.max_symbols:
+        all_symbols = all_symbols[: args.max_symbols]
+
+    total_symbols = len(all_symbols)
+    batch_size = args.batch_size
+    batch_delay = args.batch_delay
+
+    logger.info(f"Total symbols to process: {total_symbols}")
+    logger.info(f"Batch size: {batch_size}, Batch delay: {batch_delay}s")
+
+    # Process in batches
+    total_attempted = 0
+    total_succeeded = 0
+    total_failed = 0
+    batch_num = 0
+
+    for i in range(0, total_symbols, batch_size):
+        batch = all_symbols[i : i + batch_size]
+        batch_num += 1
+
+        logger.info(
+            f"Processing batch {batch_num}: symbols {i + 1} to {min(i + batch_size, total_symbols)}"
+        )
+
+        # Run update for this batch
+        report = updater.run_update(
+            symbols=batch,
+            max_symbols=None,
+            min_rows=args.min_rows,
+            prune_old=not args.no_prune,
+            validate=not args.no_validate,
+        )
+
+        total_attempted += report.get("attempted", 0)
+        total_succeeded += report.get("succeeded", 0)
+        total_failed += report.get("failed", 0)
+
+        logger.info(
+            f"Batch {batch_num} complete: {report.get('succeeded', 0)}/{report.get('attempted', 0)} succeeded"
+        )
+
+        # Wait before next batch (except for last batch)
+        if i + batch_size < total_symbols:
+            logger.info(f"Waiting {batch_delay}s before next batch...")
+            time_module.sleep(batch_delay)
+
+    # Final report
+    logger.info("=" * 60)
+    logger.info("FINAL SUMMARY")
+    logger.info("=" * 60)
+    logger.info(f"Total attempted: {total_attempted}")
+    logger.info(f"Total succeeded: {total_succeeded}")
+    logger.info(f"Total failed: {total_failed}")
+    logger.info(f"Batches processed: {batch_num}")
 
     # Exit with error code if there were failures
-    total_errors = report.get("failed", 0) + report.get("validation_errors", 0)
-    if total_errors > 0:
-        logger.warning(f"Pipeline completed with {total_errors} errors")
+    if total_failed > 0:
+        logger.warning(f"Pipeline completed with {total_failed} errors")
         sys.exit(1)
 
     sys.exit(0)

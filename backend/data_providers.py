@@ -11,6 +11,12 @@ from backend.config import Config
 
 logger = logging.getLogger(__name__)
 
+# Rate limiting for Yahoo Finance
+_yf_request_count = 0
+_yf_rate_limit_delay = 0.0
+YF_RATE_LIMIT_THRESHOLD = 30  # Add delay after this many requests
+YF_RATE_LIMIT_PAUSE = 3.0  # Seconds to pause when rate limited
+
 # ----- User-Agent rotation to avoid Yahoo Finance fingerprinting -----
 _UA_POOL = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -466,7 +472,14 @@ def _standardize_df(df: pd.DataFrame) -> pd.DataFrame:
 async def _fetch_yfinance_chunk_async(
     yf_symbol: str, chunk_start: datetime, chunk_end: datetime
 ) -> Optional[pd.DataFrame]:
-    """Async helper to fetch a single chunk from yfinance."""
+    """Async helper to fetch a single chunk from yfinance with rate limiting."""
+    global _yf_request_count, _yf_rate_limit_delay
+
+    # Apply rate limiting delay if needed
+    if _yf_rate_limit_delay > 0:
+        await asyncio.sleep(_yf_rate_limit_delay)
+        _yf_rate_limit_delay = 0.0
+
     loop = asyncio.get_event_loop()
     try:
         ticker = yf.Ticker(yf_symbol)
@@ -476,9 +489,25 @@ async def _fetch_yfinance_chunk_async(
                 interval="1m", start=chunk_start, end=chunk_end, auto_adjust=False
             ),
         )
+
+        _yf_request_count += 1
+
+        # Check if we need to rate limit
+        if _yf_request_count >= YF_RATE_LIMIT_THRESHOLD:
+            logger.warning(
+                f"Rate limit threshold reached ({YF_RATE_LIMIT_THRESHOLD}), pausing..."
+            )
+            _yf_rate_limit_delay = YF_RATE_LIMIT_PAUSE
+            _yf_request_count = 0
+
         if df is not None and not df.empty:
             return _standardize_df(df)
     except Exception as e:
+        err_str = str(e).lower()
+        if "rate" in err_str or "429" in err_str or "too many" in err_str:
+            logger.warning(f"[yFinance] Rate limited, backing off...")
+            _yf_rate_limit_delay = YF_RATE_LIMIT_PAUSE * 2
+            _yf_request_count = 0
         logger.warning(f"[yFinance] Chunk error: {e}")
     return None
 
