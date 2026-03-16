@@ -7,6 +7,9 @@ const BACKEND_ORIGIN = 'https://stock-dashboard-fqtn.onrender.com';
 // Use a relative path for local dev to go through the proxy, and a full URL for production.
 const API_BASE_URL = IS_LOCALHOST ? '/api' : `${BACKEND_ORIGIN}/api`;
 
+// Expose globally for non-module scripts (like landing.js)
+window.API_BASE_URL = API_BASE_URL;
+
 export const CONFIG = {
     API_BASE_URL: API_BASE_URL,
     DEBOUNCE_DELAY: 300,

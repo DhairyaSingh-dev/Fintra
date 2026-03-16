@@ -304,8 +304,9 @@ async function showDemoResult(symbol) {
   if (contentEl) contentEl.style.display = 'none';
   
   try {
-    // Use the new demo API endpoint
-    const response = await fetch(`/api/demo/search?symbol=${encodeURIComponent(symbol)}`);
+    // Use the API_BASE_URL from config
+    const apiBase = window.API_BASE_URL || '/api';
+    const response = await fetch(`${apiBase}/demo/search?symbol=${encodeURIComponent(symbol)}`);
     console.log('Demo search response:', response.status, response.statusText);
     
     if (!response.ok) {
