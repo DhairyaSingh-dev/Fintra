@@ -1,6 +1,6 @@
 // ==================== CHATBOT ====================
-import { deps, generateSessionId, checkDependencies } from './config.js';
-import { saveSessionState, getAuthHeaders } from './auth.js';
+import { deps, generateSessionId, checkDependencies, sanitizeMarkdown } from './config.js';
+import { saveSessionState } from './auth.js';
 import { showNotification } from './notifications.js';
 import { showAuthOverlay } from './auth.js';
 
@@ -401,7 +401,7 @@ function appendMessage(message, isTemporary = false) {
     div.className = `msg msg-${role}`;
 
     if (role === 'bot' || role === 'system') {
-        const html = marked.parse(content);
+        const html = sanitizeMarkdown(content);
         div.innerHTML = html;
     } else {
         div.textContent = content;

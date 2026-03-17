@@ -1,5 +1,5 @@
 // ==================== DATA DISPLAY ====================
-import { STATE, formatPrice, formatNumber, getRsiColor, getRsiBackground, CONFIG } from './config.js';
+import { STATE, formatPrice, formatNumber, getRsiColor, getRsiBackground, CONFIG, sanitizeMarkdown } from './config.js';
 import { renderChart, destroyExistingCharts } from './charts.js';
 
 export function displayData(data) {
@@ -159,8 +159,7 @@ function createAnalysisContent(content) {
     if (!content) {
         return '<div class="unavailable-notice"><strong>⚠️ Analysis Unavailable</strong><p>Could not retrieve rule-based or AI analysis for this security.</p></div>';
     }
-    // Use marked.parse() which is now available globally
-    const html = marked.parse(content);
+    const html = sanitizeMarkdown(content);
     return `<div class="analysis-content">${html}</div>`;
 }
 

@@ -1,8 +1,8 @@
 // ==================== DATA FETCHING ====================
-import { deps } from './config.js';
+import { deps, getAuthHeaders } from './config.js';
 import { showLoading, hideLoading, hideError, showError, updateLoadingProgress } from './dom.js';
 import { displayData } from './display.js';
-import { updateAuthUI, getAuthHeaders } from './auth.js';
+import { updateAuthUI } from './auth.js';
 import { updateAnalysisDataInfo } from './data_transparency.js';
  
 const { CONFIG, STATE } = deps;

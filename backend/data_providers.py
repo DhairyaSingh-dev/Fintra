@@ -212,6 +212,63 @@ def fetch_daily_ohlcv(
     return None
 
 
+def fetch_stock_inception_date(symbol: str) -> Optional[datetime]:
+    """
+    Fetch the market inception date (first trade date) for a stock.
+
+    Uses yfinance's ticker.info with multiple fallbacks:
+    1. firstTradeDateEpoch (Unix timestamp)
+    2. startDate
+    3. Fetch max history and take earliest date
+
+    Args:
+        symbol: Stock symbol (e.g., 'RELIANCE.NS')
+
+    Returns:
+        datetime object of the first trade date, or None if unavailable
+    """
+    yf_symbol = symbol if "." in symbol else f"{symbol}.NS"
+
+    try:
+        logger.info(f"[yFinance] Fetching inception date for {yf_symbol}")
+        ticker = yf.Ticker(yf_symbol, session=_yf_session())
+        info = ticker.info
+
+        # Fallback 1: firstTradeDateEpoch (Unix timestamp)
+        if 'firstTradeDateEpoch' in info and info['firstTradeDateEpoch']:
+            inception = datetime.fromtimestamp(info['firstTradeDateEpoch'])
+            logger.info(f"[yFinance] Inception from firstTradeDateEpoch: {inception.date()}")
+            return inception
+
+        # Fallback 2: startDate
+        if 'startDate' in info and info['startDate']:
+            inception = datetime.fromtimestamp(info['startDate'])
+            logger.info(f"[yFinance] Inception from startDate: {inception.date()}")
+            return inception
+
+        # Fallback 3: Fetch max history and use first date
+        logger.info(f"[yFinance] No direct inception field, fetching max history for {yf_symbol}")
+        df = ticker.history(period="max", interval="1d")
+        if df is not None and not df.empty:
+            first_date = df.index.min()
+            if hasattr(first_date, 'to_pydatetime'):
+                inception = first_date.to_pydatetime()
+            else:
+                inception = first_date
+            # Remove timezone if present
+            if hasattr(inception, 'tzinfo') and inception.tzinfo is not None:
+                inception = inception.replace(tzinfo=None)
+            logger.info(f"[yFinance] Inception from max history: {inception.date()}")
+            return inception
+
+        logger.warning(f"[yFinance] Could not determine inception date for {yf_symbol}")
+        return None
+
+    except Exception as e:
+        logger.warning(f"[yFinance] Failed to fetch inception date for {yf_symbol}: {e}")
+        return None
+
+
 def _date_range_chunks(start_dt: datetime, end_dt: datetime, chunk_days: int = 7):
     """Yield (start, end) tuples for date ranges, each chunk_days apart."""
     current = start_dt

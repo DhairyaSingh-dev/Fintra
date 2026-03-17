@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-03-16T12:24:07.470207",
+  "pipeline": "daily",
+  "sebi_compliance_date": "2026-02-13T12:24:07.461207",
+  "update_threshold": "2026-02-20T12:24:07.461207",
+  "total_stocks": 3,
+  "checked_stocks": 1,
+  "updated_stocks": 0,
+  "skipped_stocks": 1,
+  "errors": 0,
+  "updated": [],
+  "skipped": [
+    {
+      "symbol": "STOCKA.NS",
+      "last_date": "2026-03-11T12:24:07.452209"
+    }
+  ],
+  "error_details": []
+}

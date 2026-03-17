@@ -222,20 +222,20 @@ class TestCheckStockNeedsUpdate:
         old_date = datetime.now() - timedelta(days=40)
         file_path = sample_parquet('TEST.NS', old_date)
 
-        needs_update, last_date, sebi_date = updater.check_stock_needs_update(file_path)
+        status = updater.check_stock_needs_update(file_path, check_inception=False)
 
-        assert needs_update is True
-        assert last_date is not None
-        assert abs((last_date - old_date).total_seconds()) < 1
+        assert status['needs_update'] is True
+        assert status['last_date'] is not None
+        assert abs((status['last_date'] - old_date).total_seconds()) < 1
 
     def test_fresh_data_skipped(self, updater, sample_parquet):
         """Test that fresh stock data (5 days ago) is skipped."""
         fresh_date = datetime.now() - timedelta(days=5)
         file_path = sample_parquet('FRESH.NS', fresh_date)
 
-        needs_update, last_date, sebi_date = updater.check_stock_needs_update(file_path)
+        status = updater.check_stock_needs_update(file_path, check_inception=False)
 
-        assert needs_update is False
+        assert status['needs_update'] is False
 
     def test_data_at_boundary_needs_update(self, updater, sample_parquet):
         """Test stock at exactly the threshold boundary needs update."""
@@ -243,8 +243,8 @@ class TestCheckStockNeedsUpdate:
         boundary_date = threshold - timedelta(days=1)
         file_path = sample_parquet('BOUNDARY.NS', boundary_date)
 
-        needs_update, _, _ = updater.check_stock_needs_update(file_path)
-        assert needs_update is True
+        status = updater.check_stock_needs_update(file_path, check_inception=False)
+        assert status['needs_update'] is True
 
     def test_data_just_above_threshold_skipped(self, updater, sample_parquet):
         """Test stock just above threshold is skipped."""
@@ -252,8 +252,8 @@ class TestCheckStockNeedsUpdate:
         above_threshold = threshold + timedelta(days=1)
         file_path = sample_parquet('ABOVE.NS', above_threshold)
 
-        needs_update, _, _ = updater.check_stock_needs_update(file_path)
-        assert needs_update is False
+        status = updater.check_stock_needs_update(file_path, check_inception=False)
+        assert status['needs_update'] is False
 
     def test_unreadable_file_needs_update(self, updater, temp_data_dir):
         """Test unreadable file is marked for update."""
@@ -262,10 +262,10 @@ class TestCheckStockNeedsUpdate:
         corrupted_file = subdir / 'CORRUPTED.NS.parquet'
         corrupted_file.write_text('not a parquet file')
 
-        needs_update, last_date, sebi_date = updater.check_stock_needs_update(corrupted_file)
+        status = updater.check_stock_needs_update(corrupted_file, check_inception=False)
 
-        assert needs_update is True
-        assert last_date is None
+        assert status['needs_update'] is True
+        assert status['last_date'] is None
 
 
 class TestFetchStockData:
@@ -495,3 +495,290 @@ class TestEdgeCases:
         updater = DailyDataUpdater(data_dir=Path('/nonexistent/path'))
         files = updater.get_all_stock_files()
         assert files == []
+
+
+class TestInceptionDateChecking:
+    """Tests for inception date validation and full refetch capability."""
+
+    def test_get_first_date_from_parquet_returns_correct_date(self, updater, sample_parquet):
+        """Test extracts first date from parquet file."""
+        test_date = datetime(2020, 1, 15)
+        file_path = sample_parquet('TEST.NS', test_date)
+
+        first_date = updater.get_first_date_from_parquet(file_path)
+
+        assert first_date is not None
+        assert first_date.year == 2020
+        assert first_date.month == 1
+        assert first_date.day == 15
+
+    def test_get_first_date_returns_none_for_empty_file(self, updater, temp_data_dir):
+        """Test returns None for empty parquet file."""
+        subdir = temp_data_dir / 'E'
+        subdir.mkdir()
+        file_path = subdir / 'EMPTY.NS.parquet'
+        df = pd.DataFrame()
+        df.to_parquet(file_path)
+
+        first_date = updater.get_first_date_from_parquet(file_path)
+        assert first_date is None
+
+    def test_inception_gap_triggers_full_refetch_flag(self, updater, sample_parquet):
+        """Test that gap between first_date and inception triggers needs_full_refetch."""
+        file_path = sample_parquet('TEST.NS', datetime(2024, 6, 1))
+        updater.inception_dates_cache['TEST.NS'] = datetime(2024, 1, 1).isoformat()
+
+        status = updater.check_stock_needs_update(file_path, check_inception=True)
+
+        assert status['needs_full_refetch'] is True
+        assert 'Missing historical data' in status['reason']
+        assert status['inception_date'] is not None
+
+    def test_no_inception_gap_passes_full_refetch_check(self, updater, sample_parquet):
+        """Test that matching first_date and inception passes check."""
+        first_date = datetime(2024, 1, 1)
+        file_path = sample_parquet('TEST.NS', first_date)
+        updater.inception_dates_cache['TEST.NS'] = first_date.isoformat()
+
+        status = updater.check_stock_needs_update(file_path, check_inception=True)
+
+        assert status['needs_full_refetch'] is False
+
+    def test_inception_gap_with_tolerance_allows_small_difference(self, updater, sample_parquet):
+        """Test that 5-day tolerance is allowed for inception gaps."""
+        inception_date = datetime(2024, 1, 1)
+        first_date = datetime(2024, 1, 3)  # 2 days after inception (within 5-day tolerance)
+        file_path = sample_parquet('TEST.NS', first_date)
+        updater.inception_dates_cache['TEST.NS'] = inception_date.isoformat()
+
+        status = updater.check_stock_needs_update(file_path, check_inception=True)
+
+        assert status['needs_full_refetch'] is False
+
+    def test_inception_gap_beyond_tolerance_fails(self, updater, sample_parquet):
+        """Test that gaps beyond 5 days trigger full refetch."""
+        inception_date = datetime(2024, 1, 1)
+        first_date = datetime(2024, 1, 10)  # 9 days after inception (beyond 5-day tolerance)
+        file_path = sample_parquet('TEST.NS', first_date)
+        updater.inception_dates_cache['TEST.NS'] = inception_date.isoformat()
+
+        status = updater.check_stock_needs_update(file_path, check_inception=True)
+
+        assert status['needs_full_refetch'] is True
+
+    def test_inception_check_skipped_when_check_inception_false(self, updater, sample_parquet):
+        """Test inception checking is skipped when check_inception=False."""
+        file_path = sample_parquet('TEST.NS', datetime(2024, 6, 1))
+        updater.inception_dates_cache['TEST.NS'] = datetime(2024, 1, 1).isoformat()
+
+        status = updater.check_stock_needs_update(file_path, check_inception=False)
+
+        assert status['needs_full_refetch'] is False
+        assert 'inception_date' in status
+        assert status['inception_date'] is None  # Not fetched
+
+    def test_inception_cache_load_and_save(self, updater, temp_data_dir):
+        """Test inception dates cache is persisted to disk."""
+        # Override cache file location for test
+        cache_file = temp_data_dir / 'test_inception.json'
+        updater.INCEPTION_DATES_FILE = cache_file
+
+        # Add some data
+        updater.inception_dates_cache['A.NS'] = datetime(2020, 1, 1).isoformat()
+        updater.inception_dates_cache['B.NS'] = datetime(2021, 1, 1).isoformat()
+
+        # Save
+        updater._save_inception_dates_cache()
+
+        # Verify file exists
+        assert cache_file.exists()
+
+        # Create new updater to test loading
+        updater2 = DailyDataUpdater(data_dir=temp_data_dir)
+        updater2.INCEPTION_DATES_FILE = cache_file
+        updater2._load_inception_dates_cache()
+
+        assert 'A.NS' in updater2.inception_dates_cache
+        assert 'B.NS' in updater2.inception_dates_cache
+        assert updater2.inception_dates_cache['A.NS'] == datetime(2020, 1, 1).isoformat()
+
+    def test_cache_load_handles_missing_file(self, temp_data_dir):
+        """Test cache loading gracefully handles missing file."""
+        updater = DailyDataUpdater(data_dir=temp_data_dir)
+        # Should not raise exception
+        updater._load_inception_dates_cache()
+        assert updater.inception_dates_cache == {}
+
+    def test_cache_load_handles_invalid_json(self, temp_data_dir):
+        """Test cache loading gracefully handles invalid JSON."""
+        cache_file = temp_data_dir / 'metadata' / 'inception_dates.json'
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text('invalid json{')
+
+        updater = DailyDataUpdater(data_dir=temp_data_dir)
+        # Should not raise exception
+        updater._load_inception_dates_cache()
+        assert updater.inception_dates_cache == {}
+
+    def test_fetch_full_history_returns_dataframe(self, updater, temp_data_dir):
+        """Test fetch_full_history returns proper DataFrame."""
+        with patch.object(updater, 'fetch_daily_ohlcv') as mock_fetch:
+            # Create sample data covering full range
+            dates = pd.date_range(start='2020-01-01', end='2024-01-01', freq='D')
+            mock_df = pd.DataFrame({
+                'open': [100] * len(dates),
+                'high': [105] * len(dates),
+                'low': [99] * len(dates),
+                'close': [103] * len(dates),
+                'volume': [1000000] * len(dates)
+            }, index=dates)
+            mock_fetch.return_value = mock_df
+
+            inception_date = datetime(2019, 12, 15)  # Before first date
+            result = updater.fetch_full_history('TEST.NS', inception_date)
+
+            assert result is not None
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == len(dates)
+            assert not result.empty
+
+    def test_fetch_full_history_trims_to_sebi_date(self, updater):
+        """Test fetch_full_history trims to SEBI compliance date."""
+        with patch.object(updater, 'fetch_daily_ohlcv') as mock_fetch:
+            sebi_date = datetime.now() - timedelta(days=31)
+            dates = pd.date_range(start='2020-01-01', end=datetime.now(), freq='D')
+            mock_df = pd.DataFrame({
+                'open': [100] * len(dates),
+                'close': [103] * len(dates)
+            }, index=dates)
+            mock_fetch.return_value = mock_df
+
+            inception_date = datetime(2019, 12, 15)
+            result = updater.fetch_full_history('TEST.NS', inception_date)
+
+            assert result is not None
+            assert result.index.max() <= sebi_date
+
+    def test_fetch_full_history_standardizes_columns(self, updater):
+        """Test fetch_full_history standardizes column names."""
+        with patch.object(updater, 'fetch_daily_ohlcv') as mock_fetch:
+            dates = pd.date_range(start='2020-01-01', periods=10, freq='D')
+            mock_df = pd.DataFrame({
+                'Open': [100] * 10,
+                'High': [105] * 10,
+                'Low': [99] * 10,
+                'Close': [103] * 10,
+                'Volume': [1000000] * 10
+            }, index=dates)
+            mock_fetch.return_value = mock_df
+
+            result = updater.fetch_full_history('TEST.NS', datetime(2019, 12, 15))
+
+            assert result is not None
+            assert 'open' in result.columns
+            assert 'close' in result.columns
+            assert 'volume' in result.columns
+            assert 'Open' not in result.columns
+
+    def test_fetch_full_history_returns_none_on_failure(self, updater):
+        """Test fetch_full_history returns None when fetch fails."""
+        with patch.object(updater, 'fetch_daily_ohlcv', return_value=None):
+            result = updater.fetch_full_history('TEST.NS', datetime(2019, 12, 15))
+            assert result is None
+
+    def test_perform_full_refetch_overwrites_file(self, updater, sample_parquet, temp_data_dir):
+        """Test _perform_full_refetch overwrites existing parquet."""
+        file_path = sample_parquet('TEST.NS', datetime(2024, 6, 1))  # Starts in June
+
+        inception_date = datetime(2020, 1, 1)
+        with patch.object(updater, 'fetch_full_history') as mock_fetch:
+            # Create full data from inception to SEBI date
+            dates = pd.date_range(start='2020-01-01', end='2024-05-01', freq='D')
+            new_df = pd.DataFrame({
+                'open': [100] * len(dates),
+                'close': [103] * len(dates),
+                'volume': [1000000] * len(dates)
+            }, index=dates)
+            mock_fetch.return_value = new_df
+
+            result = updater._perform_full_refetch(file_path, 'TEST.NS', inception_date)
+
+            assert result is True
+            assert file_path.exists()
+
+            # Verify file now has more data (starts from 2020 instead of 2024)
+            df = pd.read_parquet(file_path)
+            assert len(df) == len(dates)
+            assert df.index.min().year == 2020
+
+    def test_perform_full_refetch_validates_sebi_compliance(self, updater, sample_parquet):
+        """Test _perform_full_refetch validates SEBI compliance."""
+        file_path = sample_parquet('TEST.NS', datetime(2024, 6, 1))
+
+        inception_date = datetime(2020, 1, 1)
+        sebi_date = updater.get_sebi_compliance_date()
+        with patch.object(updater, 'fetch_full_history') as mock_fetch:
+            # Create data that violates SEBI (past the compliance date)
+            violation_date = sebi_date + timedelta(days=10)
+            mock_df = pd.DataFrame({
+                'open': [100],
+                'close': [103]
+            }, index=pd.DatetimeIndex([violation_date]))
+            mock_fetch.return_value = mock_df
+
+            result = updater._perform_full_refetch(file_path, 'TEST.NS', inception_date)
+
+            assert result is False
+            # Check error was logged
+            assert any(e.get('error') and 'SEBI' in e.get('error') for e in updater.errors)
+
+    def test_run_update_handles_full_refetch_in_pipeline(self, updater, sample_parquet):
+        """Test run_update correctly processes stocks needing full refetch."""
+        # Create stock with data starting in June 2024
+        file_path = sample_parquet('GAPSTOCK.NS', datetime(2024, 6, 1))
+
+        # Cache inception as Jan 2020 (large gap)
+        updater.inception_dates_cache['GAPSTOCK.NS'] = datetime(2020, 1, 1).isoformat()
+
+        # Mock fetch_full_history to return valid data
+        with patch.object(updater, 'fetch_full_history') as mock_fetch:
+            refetch_dates = pd.date_range(start='2020-01-01', end='2024-05-01', freq='D')
+            refetch_df = pd.DataFrame({
+                'open': [100] * len(refetch_dates),
+                'close': [103] * len(refetch_dates)
+            }, index=refetch_dates)
+            mock_fetch.return_value = refetch_df
+
+            status = updater.check_stock_needs_update(file_path, check_inception=True)
+            assert status['needs_full_refetch'] is True
+            assert status['needs_update'] is True  # Also needs update due to old last_date
+
+    def test_check_only_mode_reports_issues_without_updating(self, updater, sample_parquet):
+        """Test --check-only mode reports issues without making changes."""
+        file_path = sample_parquet('TEST.NS', datetime(2024, 6, 1))
+        updater.inception_dates_cache['TEST.NS'] = datetime(2020, 1, 1).isoformat()
+
+        report = updater.run_update(sample_size=1, check_only=True, check_inception=True)
+
+        # Should report issues but not update
+        assert report['inception_issues'] is not None
+        assert len(report['inception_issues']) > 0
+        # Verify file still exists with original data
+        assert file_path.exists()
+        original_df = pd.read_parquet(file_path)
+        assert len(original_df) == 1  # Only one row (June 2024)
+
+    def test_inception_issue_tracking_includes_required_fields(self, updater, sample_parquet):
+        """Test inception issues include all required metadata."""
+        file_path = sample_parquet('TEST.NS', datetime(2024, 6, 1))
+        updater.inception_dates_cache['TEST.NS'] = datetime(2020, 1, 1).isoformat()
+
+        updater.run_update(sample_size=1, check_only=True, check_inception=True)
+
+        assert len(updater.inception_date_issues) > 0
+        issue = updater.inception_date_issues[0]
+        assert 'symbol' in issue
+        assert 'reason' in issue
+        assert 'action_needed' in issue
+        assert issue['action_needed'] == 'full_refetch'
+

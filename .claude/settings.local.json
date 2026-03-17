@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find backend:*)",
+      "Bash(find static:*)",
+      "Bash(find tests:*)",
+      "Bash(find data:*)",
+      "Bash(find knowledge_base -name *.json)",
+      "Bash(ls -1 static/*.js)",
+      "Bash(ls:*)",
+      "Bash(wc -l /c/Users/user/Fintra/data/*/*.parquet)",
+      "Bash(python -c \"import pandas as pd; df = pd.read_parquet\\(''/c/Users/user/Fintra/data/A/A2ZINFRA.NS.parquet''\\); print\\(''Shape:'', df.shape\\); print\\(''Index type:'', type\\(df.index\\)\\); print\\(''Columns:'', list\\(df.columns\\)\\); print\\(''Date range:'', df.index.min\\(\\), ''to'', df.index.max\\(\\)\\); print\\(''First few rows:''\\); print\\(df.head\\(\\)\\)\")",
+      "Bash(git pull:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

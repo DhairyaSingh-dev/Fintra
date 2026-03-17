@@ -1,7 +1,7 @@
-import { deps, debounce, getRsiColor } from './config.js';
+import { deps, debounce, getRsiColor, getAuthHeaders } from './config.js';
 import { showNotification } from './notifications.js';
 import { updateChatContextIndicator } from './chat.js';
-import { getAuthHeaders, handleLogout } from './auth.js';
+import { handleLogout } from './auth.js';
 
 const { DOM, CONFIG, STATE } = deps;
 

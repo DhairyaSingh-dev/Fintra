@@ -2,8 +2,7 @@
  * Simplified Monte Carlo Front-end Controller
  */
 
-import { CONFIG } from './config.js';
-import { getAuthHeaders } from './auth.js';
+import { CONFIG, getAuthHeaders } from './config.js';
 import { showNotification } from './notifications.js';
 
 // Monte Carlo State

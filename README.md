@@ -59,28 +59,33 @@
 
 Fintra isn't just another stock dashboard—it's a **production-grade financial intelligence platform** built with institutional-level engineering practices:
 
-- **10,000+ simulation Monte Carlo engine** for statistical backtest validation
-- **Multi-model AI architecture** with intelligent load balancing across Gemini & Gemma
+- **10,000+ simulation Monte Carlo engine** for statistical backtest validation with confidence intervals
+- **Multi-model AI routing** with automatic failover across 9 unique models (3 per task type)
 - **Event-driven backtesting** with ATR-based position sizing and dynamic risk management
-- **Enterprise security** with JWT authentication, OAuth 2.0, and CSRF protection
-- **Memory optimized** to run on 512MB RAM (Render free tier)
+- **Enterprise security** with JWT authentication, OAuth 2.0, and CSRF protection via Redis-backed state tokens
+- **Memory optimized** to run on 512MB RAM (Render free tier) with lazy loading and feature flags
+- **Client-side computation** via WebAssembly for backtesting and Monte Carlo (zero server compute cost)
+- **27 API endpoints** providing comprehensive functionality
 
 ---
 
 ## 📊 Project Metrics
 
-> **14,200+ lines of production code** across a full-stack financial platform
+> **18,300+ lines of production code** across a full-stack financial platform
 
 | Category | Metric | Details |
 |----------|--------|---------|
-| **Python Backend** | 5,648 lines | 14 core modules (routes, auth, analysis, backtesting, Monte Carlo) |
-| **JavaScript Frontend** | 3,745 lines | 17 ES6 modules with dynamic imports |
-| **CSS Styling** | 4,428 lines | Custom design system with CSS variables |
-| **HTML Templates** | 441 lines | 2 responsive pages (landing + dashboard) |
-| **Test Suite** | 430 lines | Authentication & validation coverage |
-| **API Endpoints** | 24 routes | RESTful design with JWT protection |
+| **Python Backend** | 7,856 lines | 21 modules (routes, auth, analysis, backtesting, Monte Carlo, RAG, etc.) |
+| **JavaScript Frontend** | 5,800 lines | 21 ES6+ modules with dynamic imports |
+| **CSS Styling** | 7,309 lines | Custom design system (styles.css + landing.css) |
+| **HTML Templates** | 848 lines | 3 responsive pages (landing, dashboard, auth callback) |
+| **Test Suite** | 2,653 lines | 5 test modules covering auth, data pipeline, validation |
+| **API Endpoints** | 28 routes | RESTful design with JWT protection |
 | **Market Data** | 2,235 files | Parquet datasets covering NSE/BSE (India) equities |
-| **AI Models** | 5 models | Gemini 2.0 Flash + 4 Gemma variants |
+| **Knowledge Base** | 17 documents | JSON files across 4 categories (compliance, education, indicators, patterns) |
+| **AI Models** | 9 unique models | Multi-model routing across 4 task categories |
+| **Strategies** | 7 backtest strategies | Golden Cross, RSI, MACD, Composite, Momentum, Mean Reversion, Breakout |
+| **WASM Engines** | 2 Python engines | Backtesting (427 lines) + Monte Carlo (218 lines) client-side engines |
 
 ---
 
@@ -109,7 +114,8 @@ Fintra isn't just another stock dashboard—it's a **production-grade financial 
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
 │   Data Tier  │    │    AI Tier   │    │  Cache Tier  │
 │  PostgreSQL  │    │ Groq API     │    │    Redis     │
-│  + SQLite    │    │ + Gemini     │    │ + Upstash    │
+│  (optional)  │    │ + Gemini     │    │ + Upstash    │
+│   or SQLite  │    │              │    │   (REST)     │
 └──────────────┘    └──────────────┘    └──────────────┘
 ```
 
@@ -136,16 +142,18 @@ User Request → Cache Check → Local Data → yfinance → External APIs
 | **Language** | Python 3.8+ | Core backend logic |
 | **Framework** | Flask 3.0+ | REST API server |
 | **ORM** | SQLAlchemy 3.1+ | Database abstraction |
-| **Database** | PostgreSQL (prod) / SQLite (dev) | User data & positions |
+| **Database** | PostgreSQL (optional via DATABASE_URL) / SQLite (default) | User data & positions |
 | **Data Processing** | Pandas 2.2+, NumPy 1.26+ | Time series analysis |
 | **Parquet I/O** | PyArrow 14.0+ | High-performance storage |
-| **Authentication** | PyJWT + Google Auth | Token-based security |
-| **Market Data** | yfinance 0.2.40+ | Primary data source |
-| **AI/ML** | Groq SDK 0.4+ | Serverless inference |
-| **Caching** | Redis 5.0+ / Upstash Redis | Session & data caching |
-| **Rate Limiting** | Flask-Limiter | API protection |
-| **WSS** | Flask-SocketIO | Real-time features |
-| **WSGI** | Gunicorn 22.0+ | Production server |
+| **Authentication** | PyJWT + Google OAuth 2.0 | Token-based security |
+| **Market Data** | yfinance 0.2.40+ (with curl_cffi) | Primary data source for NSE/BSE/US equities |
+| **Fallback Providers** | Polygon.io, Alpha Vantage, Finnhub | Redundant data sources |
+| **AI/ML** | Groq SDK 0.4+ (Groq API) | Serverless inference |
+| **Additional AI** | google-genai (Gemini API) | Enhanced analysis capabilities |
+| **Caching** | Redis 5.0+ / Upstash Redis (REST) | Session & data caching with vector search |
+| **Vector Search** | RedisVL | RAG retrieval for knowledge base |
+| **Rate Limiting** | Custom Redis-based implementation | API protection (with Flask-Limiter in dependencies) |
+| **WSGI** | Gunicorn 22.0+ | Production server (3 workers, 2 threads) |
 
 ### **Frontend**
 
@@ -178,7 +186,7 @@ User Request → Cache Check → Local Data → yfinance → External APIs
 Local Parquet (2,235 stocks) → yfinance → Polygon → AlphaVantage → Finnhub
 ```
 
-- **2,500+ Instruments**: Indian stocks (NSE/BSE) and ETFs
+- **2,235 Instruments**: Indian stocks (NSE/BSE) and ETFs
 - **Technical Indicators**: RSI (14), MACD (12/26/9), SMA (5/10/50/200), ATR, ADX, Bollinger Bands
 - **Interactive Charts**: Chart.js with real-time updates
 - **5-Minute Cache TTL**: Intelligent expiration for performance
@@ -288,7 +296,7 @@ GROQ_MODEL_STACK = {
 
 ### **6. RAG-Enhanced Chatbot**
 
-**Knowledge Base:** 25+ documents across 4 categories
+**Knowledge Base:** 17 documents across 4 categories
 
 ```
 knowledge_base/
@@ -531,30 +539,55 @@ SESSION_TTL = 86400        # 24 hours
 
 ## 🤖 AI & Machine Learning
 
-### **Model Routing Logic**
+### **Multi-Model Routing Logic**
 
 ```python
+# Each task type has an ordered queue of 3 models with automatic fallback
+GROQ_MODEL_STACK = {
+    "chat": [
+        "llama-3.1-8b-instant",      # 30 RPM | 14.4K RPD | 6K TPM – fast responses
+        "qwen/qwen3-32b",            # 60 RPM | 1K RPD | 6K TPM – strong fallback
+        "llama-3.3-70b-versatile",   # 30 RPM | 1K RPD | 12K TPM – deep reasoning
+    ],
+    "analysis": [
+        "llama-3.3-70b-versatile",   # 30 RPM | 1K RPD | 12K TPM – technical analysis
+        "openai/gpt-oss-120b",       # 30 RPM | 1K RPD | 8K TPM – large model fallback
+        "llama-3.1-8b-instant",      # fast fallback
+    ],
+    "heavy_data": [
+        "meta-llama/llama-4-scout-17b-16e-instruct",  # 30 RPM | 30K TPM – huge context
+        "moonshotai/kimi-k2-instruct",                # 60 RPM | 10K TPM – fallback
+        "llama-3.3-70b-versatile",                    # deep fallback
+    ],
+    "safety": [
+        "meta-llama/llama-prompt-guard-2-86m",  # 30 RPM | 15K TPM – prompt injection guard
+        "meta-llama/llama-prompt-guard-2-22m",  # lightweight guard fallback
+        "meta-llama/llama-guard-4-12b",         # content moderation fallback
+    ]
+}
+
 def call_groq_api(prompt: str, task_type: str = "chat") -> str:
     """
-    Routes to optimal model based on task:
-    - chat: Fast, high-throughput (14.4K RPD)
-    - analysis: Deep reasoning (12K TPM)
-    - heavy_data: Large context (30K TPM)
-    - safety: Lightweight guard (15K TPM)
+    Routes to optimal model based on task with automatic failover.
+    Each category has 3 models in priority order.
     """
     models_queue = GROQ_MODEL_STACK.get(task_type, GROQ_MODEL_STACK["chat"])
-    
+    temperature = GROQ_TASK_TEMPERATURE.get(task_type, 0.7)
+    max_tokens = GROQ_TASK_MAX_TOKENS.get(task_type, 1024)
+
+    client = groq.Groq(api_key=Config.GROQ_API_KEY)
+
     for model in models_queue:
         try:
             response = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
-                temperature=GROQ_TASK_TEMPERATURE[task_type],
-                max_tokens=GROQ_TASK_MAX_TOKENS[task_type]
+                temperature=temperature,
+                max_tokens=max_tokens
             )
             return response.choices[0].message.content
         except Exception:
-            continue  # Automatic failover
+            continue  # Automatic failover to next model
 ```
 
 ### **Prompt Safety Screening**
@@ -612,10 +645,10 @@ User → Google OAuth → Code Exchange → ID Token Verification → JWT Genera
 | Layer | Implementation |
 |-------|---------------|
 | **Transport** | HTTPS-only (TLS 1.3) |
-| **Authentication** | JWT + OAuth 2.0 + PKCE |
-| **Session** | HttpOnly, Secure, SameSite=Strict cookies |
+| **Authentication** | JWT + OAuth 2.0 with state tokens |
+| **Session** | HttpOnly, Secure, SameSite=None (or Lax in dev) with Partitioned for cross-site |
 | **CSRF** | Redis-backed state tokens (10-min TTL) |
-| **Rate Limiting** | 30 requests/minute per user |
+| **Rate Limiting** | Custom Redis implementation: 30 requests per 60-second window |
 | **Input** | XSS pattern matching + HTML escaping |
 | **Output** | JSON serialization with NaN/Inf handling |
 
@@ -853,28 +886,28 @@ POLYGON_API_KEY=... (US stocks)
 
 | Metric | Value |
 |--------|-------|
-| **Total Lines of Code** | 14,200+ |
-| **Python Backend** | 5,648 lines (14 modules) |
-| **JavaScript Frontend** | 12,475 lines (19 modules) |
-| **CSS Styling** | 8,344 lines (custom design system) |
-| **HTML Templates** | 2 pages (landing + dashboard) |
-| **API Endpoints** | 24 RESTful routes |
+| **Total Lines of Code** | 18,300+ |
+| **Python Backend** | 7,856 lines (21 modules) |
+| **JavaScript Frontend** | 5,800 lines (21 modules) |
+| **CSS Styling** | 7,309 lines (custom design system) |
+| **HTML Templates** | 848 lines (3 pages) |
+| **API Endpoints** | 28 RESTful routes |
 | **Market Data Files** | 2,235 parquet files |
-| **Knowledge Base** | 25 documents across 4 categories |
-| **Test Suite** | 780 lines (4 test modules) |
+| **Knowledge Base** | 17 documents across 4 categories |
+| **Test Suite** | 2,653 lines (5 test modules) |
 
 ---
 
 ## 🏆 Engineering Achievements
 
-1. **WebAssembly Integration**: Full Python quant engine running client-side
+1. **WebAssembly Integration**: Full Python quant engines running client-side (backtesting + Monte Carlo)
 2. **Sub-Second Monte Carlo**: 10K simulations in <500ms via NumPy vectorization
 3. **Local-First Architecture**: 2,235 pre-cached instruments with yfinance fallback
-4. **Multi-Model AI Routing**: Automatic failover across 5+ LLM providers
-5. **Memory Optimization**: Production deployment on 512MB RAM
+4. **Multi-Model AI Routing**: Automatic failover across 9+ unique models in 4 task categories
+5. **Memory Optimization**: Production deployment on 512MB RAM with lazy loading
 6. **SEBI Compliance**: Automated 31-day lag with transparency indicators
-7. **Bulletproof CORS**: Custom hooks for cross-site authentication
-8. **RAG Implementation**: Vector search without heavy dependencies
+7. **Custom Rate Limiting**: Redis-based implementation for API protection
+8. **RAG Implementation**: Vector search without heavy dependencies using RedisVL
 
 ---
 

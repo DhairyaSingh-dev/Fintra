@@ -1,4 +1,4 @@
-import { deps } from './config.js';
+import { deps, getAuthHeaders } from './config.js';
 import { showNotification } from './notifications.js';
 
 // ==================== LOGGER (MOVED) ====================
@@ -42,12 +42,6 @@ function setAuthToken(token) {
     }
 }
 
-export function getAuthHeaders() {
-    if (STATE.authToken) {
-        return { 'Authorization': `Bearer ${STATE.authToken}` };
-    }
-    return {};
-}
 // --- END NEW ---
 
 export async function handleGoogleLogin() {

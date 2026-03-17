@@ -3,8 +3,7 @@
  * Displays SEBI compliance information and data availability
  */
 
-import { CONFIG } from './config.js';
-import { getAuthHeaders } from './auth.js';
+import { CONFIG, getAuthHeaders } from './config.js';
 
 /**
  * Fetch and display data availability information

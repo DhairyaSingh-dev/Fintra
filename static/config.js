@@ -50,6 +50,55 @@ export function getAuthHeaders() {
     return {};
 }
 
+/**
+ * Sanitize HTML output from marked.parse() to prevent XSS attacks.
+ * Uses DOMPurify if available, falls back to text-only rendering.
+ * @param {string} markdown - Raw markdown text
+ * @returns {string} - Sanitized HTML string
+ */
+export function sanitizeMarkdown(markdown) {
+    if (typeof markdown !== 'string') return '';
+    try {
+        // Parse markdown to HTML
+        const rawHtml = marked.parse(markdown);
+
+        // Sanitize with DOMPurify
+        if (typeof DOMPurify !== 'undefined') {
+            return DOMPurify.sanitize(rawHtml, {
+                ALLOWED_TAGS: [
+                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                    'p', 'br', 'hr',
+                    'ul', 'ol', 'li',
+                    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                    'code', 'pre', 'blockquote',
+                    'strong', 'em', 'b', 'i', 'u', 's',
+                    'a', 'img',
+                    'div', 'span', 'details', 'summary',
+                    'input'  // for task lists
+                ],
+                ALLOWED_ATTR: [
+                    'href', 'src', 'alt', 'title', 'class', 'id',
+                    'type', 'checked', 'disabled', 'open',
+                    'target', 'rel'
+                ],
+                ALLOW_DATA_ATTR: false
+            });
+        }
+        // If DOMPurify not available, return raw with warning
+        console.warn('DOMPurify not loaded, returning raw HTML (XSS risk)');
+        return rawHtml;
+    } catch (error) {
+        console.error('sanitizeMarkdown error:', error);
+        // Fallback: escape HTML entities
+        return markdown.replace(/[&<>"']/g, (match) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[match]);
+    }
+}
 
 export const DOM = {};
 

@@ -1,4 +1,4 @@
-import { deps, getAuthHeaders } from './config.js';
+import { deps, getAuthHeaders, sanitizeMarkdown } from './config.js';
 import { handleLogout } from './auth.js';
 import { showNotification } from './notifications.js';
 import { handleAutocompleteInput, handleAutocompleteKeydown, hideAutocomplete } from './autocomplete.js';
@@ -232,11 +232,7 @@ function updateAIAnalysisSection(markdownText) {
     if (aiContainer) {
         // Remove the loading state
         aiContainer.classList.remove('ai-loading');
-        if (typeof marked !== 'undefined') {
-            aiContainer.innerHTML = marked.parse(markdownText);
-        } else {
-            aiContainer.textContent = markdownText;
-        }
+        aiContainer.innerHTML = sanitizeMarkdown(markdownText);
     }
 }
 
@@ -481,7 +477,7 @@ function displayBacktestResults(results, params) {
                 </div>
             `;
         } else {
-            const aiHtml = marked.parse(results.ai_analysis);
+            const aiHtml = sanitizeMarkdown(results.ai_analysis);
             aiSummary = `
                 <div class="backtest-ai-summary">
                     <h3>🤖 AI Strategy Analysis</h3>
